@@ -114,6 +114,12 @@ const Vendors = () => {
 
   // Handle dialog open/close
   const handleOpenDialog = (vendorToEdit = null) => {
+    // Prevent organizations from adding new vendors
+    if (!vendorToEdit && isOrgContext) {
+      alert('Only system administrators can add new vendors.');
+      return;
+    }
+    
     if (vendorToEdit) {
       setEditVendorId(vendorToEdit.id);
       setFormData({
@@ -139,6 +145,7 @@ const Vendors = () => {
         orgIds: isOrgContext ? [orgId] : []
       });
     }
+    
     setDialogOpen(true);
   };
   
@@ -151,6 +158,14 @@ const Vendors = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     try {
+      // Prevent adding new vendors in organization context
+      if (isOrgContext && !editVendorId) {
+        console.error('Organizations cannot add new vendors');
+        alert('Only system administrators can add new vendors.');
+        handleCloseDialog();
+        return;
+      }
+      
       // Handle both new vendors and edits
       let vendorData;
       
@@ -251,13 +266,15 @@ const Vendors = () => {
           </Select>
         </FormControl>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Vendor
-        </Button>
+        {!isOrgContext && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add Vendor
+          </Button>
+        )}
       </Box>
       
       {/* Vendor relationships table */}
@@ -343,9 +360,7 @@ const Vendors = () => {
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           {isOrgContext
-            ? editVendorId 
-              ? `Manage Vendor Relationship - ${currentOrg?.name}`
-              : `Add Vendor to ${currentOrg?.name}`
+            ? `Manage Vendor Relationship - ${currentOrg?.name}`
             : editVendorId
               ? 'Edit Vendor'
               : 'Add New Vendor'
