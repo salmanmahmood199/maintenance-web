@@ -1,0 +1,205 @@
+import React, { useState } from 'react';
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
+} from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import { useData } from '../context/DataContext';
+
+const SUBSCRIPTION_PLANS = [
+  { value: 'basic', label: 'Basic' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'premium', label: 'Premium' }
+];
+
+const Organizations = () => {
+  const navigate = useNavigate();
+  const { getOrganizations, addOrganization } = useData();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    contactName: '',
+    contactEmail: '',
+    contactPhone: '',
+    plan: 'basic'
+  });
+
+  // Handle input change
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Handle dialog open/close
+  const handleOpenDialog = () => setDialogOpen(true);
+  const handleCloseDialog = () => setDialogOpen(false);
+
+  // Handle form submission
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    addOrganization(formData);
+    setFormData({
+      name: '',
+      contactName: '',
+      contactEmail: '',
+      contactPhone: '',
+      plan: 'basic'
+    });
+    handleCloseDialog();
+  };
+
+  // Get all organizations
+  const organizations = getOrganizations();
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Organizations
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleOpenDialog}
+        >
+          Add Organization
+        </Button>
+      </Box>
+
+      {/* Organizations Table */}
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Contact Name</TableCell>
+              <TableCell>Contact Email</TableCell>
+              <TableCell>Contact Phone</TableCell>
+              <TableCell>Subscription Plan</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {organizations.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  No organizations found
+                </TableCell>
+              </TableRow>
+            ) : (
+              organizations.map((org) => (
+                <TableRow 
+                  key={org.id}
+                  hover
+                  onClick={() => navigate(`/organizations/${org.id}`)}
+                  sx={{ cursor: 'pointer' }}
+                >
+                  <TableCell>{org.name}</TableCell>
+                  <TableCell>{org.contactName}</TableCell>
+                  <TableCell>{org.contactEmail}</TableCell>
+                  <TableCell>{org.contactPhone}</TableCell>
+                  <TableCell>
+                    {SUBSCRIPTION_PLANS.find(plan => plan.value === org.plan)?.label || 'Unknown'}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Add Organization Dialog */}
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Organization</DialogTitle>
+        <DialogContent>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="name"
+              label="Organization Name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="contactName"
+              label="Contact Name"
+              name="contactName"
+              value={formData.contactName}
+              onChange={handleChange}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="contactEmail"
+              label="Contact Email"
+              name="contactEmail"
+              type="email"
+              value={formData.contactEmail}
+              onChange={handleChange}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="contactPhone"
+              label="Contact Phone"
+              name="contactPhone"
+              value={formData.contactPhone}
+              onChange={handleChange}
+            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="plan-label">Subscription Plan</InputLabel>
+              <Select
+                labelId="plan-label"
+                id="plan"
+                name="plan"
+                value={formData.plan}
+                label="Subscription Plan"
+                onChange={handleChange}
+              >
+                {SUBSCRIPTION_PLANS.map((plan) => (
+                  <MenuItem key={plan.value} value={plan.value}>
+                    {plan.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained">
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default Organizations;

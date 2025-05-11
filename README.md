@@ -1,6 +1,49 @@
-# Getting Started with Create React App
+# Maintenance Web Application
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React-based web application for managing maintenance tickets, organizations, vendors, and more.
+
+## Technology Stack
+
+- **Frontend**: React 18
+- **UI Library**: Material-UI v5 (dark mode + theming)
+- **Routing**: React Router v6
+- **State Management**: React Context (AuthContext + DataContext)
+- **Data Persistence**: LocalStorage (for MVP)
+
+## Features
+
+- Authentication system (static login for MVP)
+- Dashboard with entity counts
+- Organizations management
+- Vendors management with organization assignments
+- Sub-Admins management
+- Security Groups configuration
+- Locations management
+- Ticket management with workflow states
+- Responsive design for mobile and desktop
+
+## Folder Structure
+
+```
+maintenance-web/
+├─ public/            # Static assets
+├─ src/
+│  ├─ components/     # Shared UI components
+│  ├─ context/        # AuthContext, DataContext
+│  ├─ pages/          # Application pages
+│  ├─ theme.js        # MUI custom theme
+│  ├─ App.js          # Routes + providers
+│  └─ index.js        # ReactDOM render
+├─ package.json
+└─ README.md
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v14 or later)
+- npm or yarn
 
 ## Available Scripts
 
