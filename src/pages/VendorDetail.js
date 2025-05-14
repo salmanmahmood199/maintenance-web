@@ -264,8 +264,7 @@ const VendorDetail = () => {
                 key={org.id} 
                 label={org.name} 
                 color="primary" 
-                onClick={() => navigate(`/organizations/${org.id}`)}
-                sx={{ cursor: 'pointer' }}
+                variant="outlined"
               />
             ))
           ) : (
