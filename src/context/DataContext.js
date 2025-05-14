@@ -534,23 +534,44 @@ export const DataProvider = ({ children }) => {
   
   const getLocations = (orgId = null) => 
     orgId
-      ? getItems('locations', location => location.organizationId === orgId)
+      ? getItems('locations', location => location.orgId === orgId)
       : getItems('locations');
-  
+      
   // Ticket management
-  const addTicket = ticket => {
+  const addTicket = (ticketData) => {
+    const { locationId, issueType, description, placedBy, mediaUrls = [], notes = '', priority = 'medium' } = ticketData;
+    
+    const ticketNo = `TICK-${Math.floor(Math.random() * 10000)}`;
+    
     const newTicket = {
-      ...ticket,
-      status: 'new',
-      createdAt: new Date().toISOString(),
+      id: 'tick' + Date.now(),
+      ticketNo,
+      locationId,
+      issueType,
+      description,
+      placedBy,
+      dateTime: new Date().toISOString(),
+      status: 'New',
+      vendorId: null, // will be set when assigned
+      notes: notes ? [{text: notes, date: new Date().toISOString(), by: placedBy}] : [],
+      mediaUrls,
+      priority,
+      // Workflow tracking fields
+      adminApproved: false,
+      workOrderCreated: false,
+      invoiceUploaded: false,
+      finalApprovalRequested: false,
+      completionDate: null,
+      verificationDate: null,
       history: [
         {
           action: 'created',
           timestamp: new Date().toISOString(),
-          userId: ticket.createdBy
+          by: placedBy
         }
       ]
     };
+    
     return addItem('tickets', newTicket);
   };
   
@@ -566,6 +587,37 @@ export const DataProvider = ({ children }) => {
       : getItems('tickets');
   
   // Workflow functions for tickets
+  
+  // Approve a ticket (admin approval)
+  const approveTicket = (id, note = '') => {
+    const ticket = getTicket(id);
+    if (!ticket) throw new Error('Ticket not found');
+    
+    const updatedNotes = [...(ticket.notes || [])];
+    if (note) {
+      updatedNotes.push({
+        text: note,
+        date: new Date().toISOString(),
+        by: 'Admin'
+      });
+    }
+    
+    updateTicket(id, {
+      ...ticket,
+      adminApproved: true,
+      notes: updatedNotes,
+      history: [
+        ...(ticket.history || []),
+        {
+          action: 'approved',
+          timestamp: new Date().toISOString(),
+          note
+        }
+      ]
+    });
+  };
+  
+  // Assign a ticket to a vendor
   const assignTicket = (id, vendorId) => {
     const ticket = getTicket(id);
     if (!ticket) throw new Error('Ticket not found');
@@ -575,15 +627,35 @@ export const DataProvider = ({ children }) => {
     
     updateTicket(id, {
       ...ticket,
-      status: 'assigned',
+      status: 'Assigned',
       vendorId,
       assignedAt: new Date().toISOString(),
       history: [
-        ...ticket.history,
+        ...(ticket.history || []),
         {
           action: 'assigned',
           timestamp: new Date().toISOString(),
           vendorId
+        }
+      ]
+    });
+  };
+  
+  // Create work order
+  const createWorkOrder = (id, workOrderDetails = {}) => {
+    const ticket = getTicket(id);
+    if (!ticket) throw new Error('Ticket not found');
+    
+    updateTicket(id, {
+      ...ticket,
+      workOrderCreated: true,
+      workOrderDetails,
+      history: [
+        ...(ticket.history || []),
+        {
+          action: 'work_order_created',
+          timestamp: new Date().toISOString(),
+          details: workOrderDetails
         }
       ]
     });
@@ -595,10 +667,10 @@ export const DataProvider = ({ children }) => {
     
     updateTicket(id, {
       ...ticket,
-      status: 'in_progress',
+      status: 'In Progress',
       startedAt: new Date().toISOString(),
       history: [
-        ...ticket.history,
+        ...(ticket.history || []),
         {
           action: 'started',
           timestamp: new Date().toISOString()
@@ -607,61 +679,101 @@ export const DataProvider = ({ children }) => {
     });
   };
   
-  const pauseWork = (id, note) => {
+  const pauseWork = (id, reason) => {
     const ticket = getTicket(id);
     if (!ticket) throw new Error('Ticket not found');
     
     updateTicket(id, {
       ...ticket,
-      status: 'paused',
+      status: 'Paused',
       pausedAt: new Date().toISOString(),
-      pauseNote: note,
+      pauseReason: reason,
       history: [
-        ...ticket.history,
+        ...(ticket.history || []),
         {
           action: 'paused',
           timestamp: new Date().toISOString(),
-          note
+          reason
         }
       ]
     });
   };
   
-  const completeWork = (id, note) => {
+  const uploadInvoice = (id, invoiceDetails) => {
     const ticket = getTicket(id);
     if (!ticket) throw new Error('Ticket not found');
     
     updateTicket(id, {
       ...ticket,
-      status: 'completed',
-      completedAt: new Date().toISOString(),
-      completionNote: note,
+      invoiceUploaded: true,
+      invoiceDetails,
       history: [
-        ...ticket.history,
+        ...(ticket.history || []),
+        {
+          action: 'invoice_uploaded',
+          timestamp: new Date().toISOString(),
+          invoiceDetails
+        }
+      ]
+    });
+  };
+  
+  const requestFinalApproval = (id) => {
+    const ticket = getTicket(id);
+    if (!ticket) throw new Error('Ticket not found');
+    
+    updateTicket(id, {
+      ...ticket,
+      finalApprovalRequested: true,
+      history: [
+        ...(ticket.history || []),
+        {
+          action: 'final_approval_requested',
+          timestamp: new Date().toISOString()
+        }
+      ]
+    });
+  };
+  
+  const completeWork = (id, notes) => {
+    const ticket = getTicket(id);
+    if (!ticket) throw new Error('Ticket not found');
+    
+    const completionDate = new Date().toISOString();
+    
+    updateTicket(id, {
+      ...ticket,
+      status: 'Completed',
+      completedAt: completionDate,
+      completionDate: completionDate,
+      completionNotes: notes,
+      history: [
+        ...(ticket.history || []),
         {
           action: 'completed',
-          timestamp: new Date().toISOString(),
-          note
+          timestamp: completionDate,
+          notes
         }
       ]
     });
   };
   
-  const verifyCompletion = (id, verifiedBy) => {
+  const verifyCompletion = (id) => {
     const ticket = getTicket(id);
     if (!ticket) throw new Error('Ticket not found');
     
+    const verificationDate = new Date().toISOString();
+    
     updateTicket(id, {
       ...ticket,
-      status: 'verified',
-      verifiedAt: new Date().toISOString(),
-      verifiedBy,
+      status: 'Verified',
+      verifiedAt: verificationDate,
+      verificationDate: verificationDate,
       history: [
-        ...ticket.history,
+        ...(ticket.history || []),
         {
           action: 'verified',
-          timestamp: new Date().toISOString(),
-          verifiedBy
+          timestamp: verificationDate
         }
       ]
     });
@@ -866,9 +978,13 @@ export const DataProvider = ({ children }) => {
     getTickets,
     
     // Ticket Workflow
+    approveTicket,
     assignTicket,
+    createWorkOrder,
     startWork,
     pauseWork,
+    uploadInvoice,
+    requestFinalApproval,
     completeWork,
     verifyCompletion,
     

@@ -27,7 +27,15 @@ import {
   ListItemText,
   Divider,
   Grid,
-  Alert
+  Alert,
+  Stepper,
+  Step,
+  StepLabel,
+  StepButton,
+  StepContent,
+  Card,
+  CardContent,
+  Tooltip
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -61,6 +69,18 @@ const STATUS_COLORS = {
   'Completed': 'success',
   'Verified': 'secondary'
 };
+
+// Ticket workflow stages
+const TICKET_WORKFLOW = [
+  { key: 'created', label: 'Ticket Placed', description: 'Maintenance request submitted', status: 'New' },
+  { key: 'pending_approval', label: 'Pending Approval', description: 'Waiting for approval from admin', status: 'New' },
+  { key: 'assigned', label: 'Vendor Assigned', description: 'Ticket assigned to vendor', status: 'Assigned' },
+  { key: 'work_order', label: 'Work Order Created', description: 'Vendor created work order', status: 'Assigned' },
+  { key: 'in_progress', label: 'Work In Progress', description: 'Vendor is working on the issue', status: 'In Progress' },
+  { key: 'invoice_uploaded', label: 'Invoice Uploaded', description: 'Work completed and invoice uploaded', status: 'Completed' },
+  { key: 'awaiting_approval', label: 'Awaiting Approval', description: 'Waiting for final approval', status: 'Completed' },
+  { key: 'completed', label: 'Order Complete', description: 'All work verified and completed', status: 'Verified' }
+];
 
 const Tickets = () => {
   const { user, currentUser } = useAuth();
@@ -287,6 +307,39 @@ const Tickets = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleString();
+  };
+  
+  // Determine the current step in the workflow
+  const determineCurrentStep = (ticket) => {
+    if (!ticket) return 0; // Default to first step
+    
+    // Early completion logic
+    if (ticket.status === 'Verified') {
+      return TICKET_WORKFLOW.length - 1; // Last step (completed)
+    }
+    
+    // Determine progress based on status and other fields
+    switch (ticket.status) {
+      case 'New':
+        return ticket.adminApproved ? 1 : 0; // Either "Ticket Placed" or "Pending Approval"
+        
+      case 'Assigned':
+        return ticket.workOrderCreated ? 3 : 2; // Either "Vendor Assigned" or "Work Order Created"
+        
+      case 'In Progress':
+        return 4; // "Work In Progress"
+        
+      case 'Completed':
+        return ticket.invoiceUploaded ? 
+          (ticket.finalApprovalRequested ? 6 : 5) : // "Invoice Uploaded" or "Awaiting Approval"
+          5; // Default to "Invoice Uploaded" if we don't have explicit flags
+        
+      case 'Paused':
+        return 4; // Consider "Paused" as still in the "Work In Progress" step
+        
+      default:
+        return 0;
+    }
   };
 
   // Handle action button click
@@ -727,6 +780,34 @@ const Tickets = () => {
             </Typography>
             
             <Divider sx={{ mb: 2 }} />
+            
+            {/* Ticket Progress Bar */}
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                  Ticket Progress
+                </Typography>
+                <Stepper activeStep={determineCurrentStep(selectedTicket)} orientation="vertical" sx={{ mt: 2 }}>
+                  {TICKET_WORKFLOW.map((step, index) => (
+                    <Step key={step.key} completed={index <= determineCurrentStep(selectedTicket)}>
+                      <StepLabel 
+                        optional={<Typography variant="caption">{step.description}</Typography>}
+                      >
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            fontWeight: index === determineCurrentStep(selectedTicket) ? 'bold' : 'normal',
+                            color: index === determineCurrentStep(selectedTicket) ? 'primary.main' : 'inherit'
+                          }}
+                        >
+                          {step.label}
+                        </Typography>
+                      </StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+              </CardContent>
+            </Card>
             
             <Grid container spacing={2}>
               <Grid item xs={6}>
