@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -126,14 +126,24 @@ const Tickets = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filteredTickets, setFilteredTickets] = useState([]);
   
+  // Add state for storing async data
+  const [tickets, setTickets] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  
   // Apply filters to tickets
   const applyFilters = useCallback(() => {
+    if (!tickets || tickets.length === 0) {
+      setFilteredTickets([]);
+      return;
+    }
+    
     let filtered = [...tickets];
     
     // Filter by ticket number
     if (filters.ticketNo) {
       filtered = filtered.filter(ticket => 
-        ticket.ticketNo.toLowerCase().includes(filters.ticketNo.toLowerCase())
+        ticket.ticketNo?.toLowerCase().includes(filters.ticketNo.toLowerCase())
       );
     }
     
@@ -217,11 +227,6 @@ const Tickets = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [filePreviewUrls, setFilePreviewUrls] = useState([]);
 
-  // Add state for storing async data
-  const [tickets, setTickets] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [vendors, setVendors] = useState([]);
-  
   // Fetch data when component mounts
   useEffect(() => {
     const fetchData = async () => {
