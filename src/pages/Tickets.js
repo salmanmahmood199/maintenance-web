@@ -36,7 +36,8 @@ import {
   PlayArrow as StartIcon,
   Pause as PauseIcon,
   Check as CompleteIcon,
-  Verified as VerifyIcon
+  Verified as VerifyIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -93,8 +94,15 @@ const Tickets = () => {
     issueType: '',
     description: '',
     placedBy: user?.email || '',
-    mediaUrls: [] // Placeholder for future file uploads
+    notes: '',
+    timestamp: new Date().toISOString(),
+    priority: 'medium',
+    mediaUrls: [] // Will store file upload references
   });
+  
+  // State for file uploads
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [filePreviewUrls, setFilePreviewUrls] = useState([]);
 
   // Add state for storing async data
   const [tickets, setTickets] = useState([]);
@@ -151,17 +159,64 @@ const Tickets = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+  
+  // Handle file upload
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedFiles(prev => [...prev, ...files]);
+    
+    // Create preview URLs for images
+    const newPreviewUrls = files.map(file => {
+      // Only create previews for images
+      if (file.type.startsWith('image/')) {
+        return URL.createObjectURL(file);
+      }
+      // For non-images, return a placeholder or icon
+      return file.type.includes('video') 
+        ? '/video-placeholder.png' // placeholder for videos
+        : '/file-placeholder.png';  // placeholder for other files
+    });
+    
+    setFilePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+  };
+  
+  // Remove a file
+  const handleRemoveFile = (index) => {
+    // Release object URL to avoid memory leaks
+    if (filePreviewUrls[index] && filePreviewUrls[index].startsWith('blob:')) {
+      URL.revokeObjectURL(filePreviewUrls[index]);
+    }
+    
+    // Remove file and preview
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setFilePreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
 
   // Handle dialog open/close
   const handleOpenDialog = () => setDialogOpen(true);
   const handleCloseDialog = () => {
     setDialogOpen(false);
-    // Reset form
+    
+    // Release object URLs to avoid memory leaks
+    filePreviewUrls.forEach(url => {
+      if (url && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+    
+    // Reset all form states
+    setSelectedFiles([]);
+    setFilePreviewUrls([]);
+    
+    // Reset form data
     setFormData({
       locationId: '',
       issueType: '',
       description: '',
       placedBy: user?.email || '',
+      notes: '',
+      timestamp: new Date().toISOString(),
+      priority: 'medium',
       mediaUrls: []
     });
   };
@@ -170,7 +225,27 @@ const Tickets = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await addTicket(formData);
+      // In a real application, we would upload files to storage here
+      // and get back URLs to store in the ticket
+      // For this demo, we'll just simulate it
+      
+      // Simulate file uploads and get URLs
+      const mediaUrls = selectedFiles.map((file, index) => {
+        // In a real app, we'd upload the file and get a real URL
+        // Here we're just creating fake URLs as a demonstration
+        return `https://example.com/uploads/${Date.now()}-${index}-${file.name}`;
+      });
+      
+      // Create the final ticket data with all fields
+      const ticketData = {
+        ...formData,
+        mediaUrls,
+        timestamp: new Date().toISOString(), // Ensure we have the current timestamp
+        status: 'New' // Default status for new tickets
+      };
+      
+      console.log('Creating ticket with data:', ticketData);
+      await addTicket(ticketData);
       
       // Refresh tickets data after adding a new one
       const newTickets = await getTickets();
@@ -430,6 +505,37 @@ const Tickets = () => {
         <DialogTitle>Create Ticket</DialogTitle>
         <DialogContent>
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+            {/* Timestamp field - grayed out and auto-filled */}
+            <TextField
+              margin="normal"
+              fullWidth
+              id="timestamp"
+              label="Timestamp"
+              name="timestamp"
+              value={new Date(formData.timestamp).toLocaleString()}
+              InputProps={{
+                readOnly: true,
+              }}
+              disabled
+              sx={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', mb: 2 }}
+            />
+            
+            {/* Placed By field - grayed out and auto-filled with current user */}
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="placedBy"
+              label="Placed By"
+              name="placedBy"
+              value={formData.placedBy}
+              InputProps={{
+                readOnly: true,
+              }}
+              disabled
+              sx={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', mb: 2 }}
+            />
+            
             <FormControl fullWidth margin="normal" required>
               <InputLabel id="location-label">Location</InputLabel>
               <Select
@@ -472,6 +578,23 @@ const Tickets = () => {
               </Select>
             </FormControl>
             
+            <FormControl fullWidth margin="normal" required>
+              <InputLabel id="priority-label">Priority</InputLabel>
+              <Select
+                labelId="priority-label"
+                id="priority"
+                name="priority"
+                value={formData.priority}
+                label="Priority"
+                onChange={handleChange}
+              >
+                <MenuItem value="low">Low</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="high">High</MenuItem>
+                <MenuItem value="critical">Critical</MenuItem>
+              </Select>
+            </FormControl>
+            
             <TextField
               margin="normal"
               required
@@ -480,26 +603,100 @@ const Tickets = () => {
               label="Description"
               name="description"
               multiline
-              rows={4}
+              rows={3}
               value={formData.description}
               onChange={handleChange}
+              placeholder="Describe the issue in detail"
             />
             
             <TextField
               margin="normal"
-              required
               fullWidth
-              id="placedBy"
-              label="Placed By"
-              name="placedBy"
-              value={formData.placedBy}
+              id="notes"
+              label="Additional Notes"
+              name="notes"
+              multiline
+              rows={2}
+              value={formData.notes}
               onChange={handleChange}
+              placeholder="Any additional information or context"
             />
             
-            {/* File upload placeholder for future implementation */}
-            <Alert severity="info" sx={{ mt: 2 }}>
-              File upload functionality will be available in a future update.
-            </Alert>
+            {/* File Upload Section */}
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Upload Images/Videos
+              </Typography>
+              
+              <input
+                accept="image/*,video/*"
+                style={{ display: 'none' }}
+                id="contained-button-file"
+                multiple
+                type="file"
+                onChange={handleFileUpload}
+              />
+              <label htmlFor="contained-button-file">
+                <Button
+                  variant="outlined"
+                  component="span"
+                  startIcon={<AddIcon />}
+                >
+                  Add Files
+                </Button>
+              </label>
+              
+              {/* File Preview Section */}
+              {filePreviewUrls.length > 0 && (
+                <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {filePreviewUrls.map((url, index) => (
+                    <Box 
+                      key={index} 
+                      sx={{ 
+                        position: 'relative',
+                        width: 100, 
+                        height: 100, 
+                        border: '1px solid #ddd',
+                        borderRadius: 1,
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {url.startsWith('blob:') ? (
+                        <img 
+                          src={url} 
+                          alt={`Preview ${index}`} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                      ) : (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          width: '100%',
+                          height: '100%',
+                          bgcolor: '#f5f5f5',
+                          color: 'text.secondary'
+                        }}>
+                          {url.includes('video') ? 'Video' : 'File'}
+                        </Box>
+                      )}
+                      <IconButton 
+                        size="small" 
+                        sx={{ 
+                          position: 'absolute', 
+                          top: 0, 
+                          right: 0, 
+                          bgcolor: 'rgba(255,255,255,0.7)' 
+                        }}
+                        onClick={() => handleRemoveFile(index)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
+              )}  
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
