@@ -361,23 +361,23 @@ const Vendors = () => {
                   key={vendor.id} 
                   hover 
                   sx={{ 
-                    cursor: 'pointer',
-                    '&:hover': { backgroundColor: 'action.hover' } 
+                    cursor: isOrgContext ? 'default' : 'pointer',
+                    '&:hover': { backgroundColor: isOrgContext ? '' : 'action.hover' } 
                   }}
-                  onClick={() => navigate(`/vendors/${vendor.id}`)}
+                  onClick={isOrgContext ? undefined : () => navigate(`/vendors/${vendor.id}`)}
                 >
                   <TableCell>
                     <Box 
                       sx={{ 
                         display: 'flex', 
                         alignItems: 'center',
-                        cursor: 'pointer',
-                        '&:hover': {
+                        cursor: isOrgContext ? 'default' : 'pointer',
+                        '&:hover': isOrgContext ? {} : {
                           textDecoration: 'underline',
                           color: 'primary.main'
                         }
                       }}
-                      onClick={() => navigate(`/vendors/${vendor.id}`)}
+                      onClick={isOrgContext ? undefined : () => navigate(`/vendors/${vendor.id}`)}
                     >
                       <VendorIcon color="primary" sx={{ mr: 1 }} />
                       {vendor.name}
@@ -425,17 +425,19 @@ const Vendors = () => {
                     >
                       Manage
                     </Button>
-                    <Button 
-                      size="small" 
-                      color="primary"
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent row click from triggering
-                        navigate(`/vendors/${vendor.id}`);
-                      }}
-                      sx={{ ml: 1 }}
-                    >
-                      View Details
-                    </Button>
+                    {!isOrgContext && (
+                      <Button 
+                        size="small" 
+                        color="primary"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent row click from triggering
+                          navigate(`/vendors/${vendor.id}`);
+                        }}
+                        sx={{ ml: 1 }}
+                      >
+                        View Details
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
