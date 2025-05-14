@@ -63,8 +63,30 @@ const Locations = () => {
     orgId: isOrgContext ? orgId : ''
   });
 
-  // Get organizations based on context
-  const organizations = getOrganizations();
+  // Add state for locations and organizations
+  const [locations, setLocations] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  
+  // Fetch locations and organizations
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch organizations
+        const orgs = await getOrganizations();
+        setOrganizations(orgs || []);
+        
+        // Fetch locations
+        const locs = await getLocations();
+        setLocations(locs || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setOrganizations([]);
+        setLocations([]);
+      }
+    };
+    
+    fetchData();
+  }, [getOrganizations, getLocations]);
   
   useEffect(() => {
     // Update form data when organization context changes
@@ -118,7 +140,7 @@ const Locations = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       // In organization context, directly use the org ID
@@ -127,7 +149,12 @@ const Locations = () => {
         orgId: orgId
       } : formData;
       
-      addLocation(locationData);
+      await addLocation(locationData);
+      
+      // Refresh locations after adding a new one
+      const locs = await getLocations();
+      setLocations(locs || []);
+      
       handleCloseDialog();
     } catch (error) {
       console.error('Failed to add location:', error);
@@ -135,11 +162,10 @@ const Locations = () => {
     }
   };
 
-  // Get locations based on context
-  const allLocations = getLocations();
-  const locations = isOrgContext 
-    ? allLocations.filter(loc => loc.orgId === orgId)
-    : allLocations;
+  // Filter locations based on context
+  const filteredLocations = isOrgContext 
+    ? locations.filter(loc => loc.orgId === orgId)
+    : locations;
 
   // Helper to get organization name
   const getOrgName = (orgId) => {
@@ -205,7 +231,7 @@ const Locations = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {locations.length === 0 ? (
+            {filteredLocations.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={isOrgContext ? 4 : 5} align="center">
                   <Box sx={{ py: 3 }}>
@@ -229,7 +255,7 @@ const Locations = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              locations.map((location) => (
+              filteredLocations.map((location) => (
                 <TableRow key={location.id}>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>

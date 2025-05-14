@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -16,6 +16,9 @@ import {
   DialogActions,
   TextField,
   FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormLabel,
   InputLabel,
   Select,
   MenuItem,
@@ -70,6 +73,36 @@ function TabPanel(props) {
   );
 }
 
+// Format phone number to (XXX) XXX-XXXX format
+const formatPhoneNumber = (phoneNumberString) => {
+  if (!phoneNumberString) return '';
+  
+  // Strip all non-numeric characters
+  const cleaned = ('' + phoneNumberString).replace(/\D/g, '');
+  
+  // Check if the input is of correct length
+  const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/);
+  
+  if (match) {
+    return '(' + match[1] + ') ' + match[2] + '-' + match[3];
+  }
+  
+  return phoneNumberString; // Return original if formatting fails
+};
+
+// Clean email address by removing any timestamp after +
+const formatEmail = (email) => {
+  if (!email) return '';
+  
+  // If email contains a + character followed by numbers before @, clean it up
+  const match = email.match(/^([^+]+)\+\d+(@.*)$/);
+  if (match) {
+    return match[1] + match[2];
+  }
+  
+  return email; // Return original if no formatting needed
+};
+
 const OrganizationDetailRevised = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -88,56 +121,45 @@ const OrganizationDetailRevised = () => {
     isPhoneUnique,
     isPasswordStrong
   } = useData();
+  
+  // Add state to store vendors
+  const [organizationVendors, setOrganizationVendors] = useState([]);
 
-  // User role templates with predefined permissions
-  const userRoleTemplates = [
-    {
-      name: 'Property Manager',
-      description: 'Can place and view tickets, manage locations',
-      permissions: ['subadmin.placeTicket', 'subadmin.viewTickets', 'subadmin.addLocation', 'subadmin.assignLocation']
-    },
-    {
-      name: 'Maintenance Coordinator',
-      description: 'Can place, accept and assign tickets to vendors',
-      permissions: ['subadmin.placeTicket', 'subadmin.viewTickets', 'subadmin.acceptTicket']
-    },
-    {
-      name: 'Vendor Manager',
-      description: 'Can manage vendors and their tiers',
-      permissions: ['subadmin.viewTickets', 'subadmin.manageVendors']
-    },
-    {
-      name: 'Accounting',
-      description: 'Can review and approve invoices',
-      permissions: ['subadmin.viewTickets', 'subadmin.acceptInvoice']
-    },
-    {
-      name: 'Custom Role',
-      description: 'Select individual permissions',
-      permissions: [] // No default permissions
-    }
+  // Define available roles - matching the roles in SubAdmins.js for consistency
+  const availableRoles = [
+    { id: 'subadmin.placeTicket', label: 'Place Ticket', description: 'Create a new maintenance ticket: fill in location, issue type, description, upload media, and submit it.' },
+    { id: 'subadmin.acceptTicket', label: 'Accept Ticket', description: 'Pick up ("accept") an unassigned ticket at Tier 1: you see New tickets and can assign them to vendors.' },
+    { id: 'subadmin.tier2AcceptTicket', label: 'Tier 2 Accept Ticket', description: 'Accept or reassign tickets that have escalated past Tier 1 (i.e. Tier 2 queue).' },
+    { id: 'subadmin.tier3AcceptTicket', label: 'Tier 3 Accept Ticket', description: 'Accept or reassign tickets that have escalated past Tier 2 (i.e. Tier 3 queue).' },
+    { id: 'subadmin.addVendor', label: 'Add Vendor', description: 'Add a new vendor record to the org: enter name, email, phone, password, and link them to one/multiple orgs.' },
+    { id: 'subadmin.addIssueType', label: 'Add Issue Type', description: 'Extend the "Type of Issue" lookup: add new categories like "Elevator" or "Electrical."' },
+    { id: 'subadmin.acceptInvoice', label: 'Accept Invoice', description: 'Review and approve a vendor-generated invoice before it goes to accounts payable.' },
+    { id: 'subadmin.addLocation', label: 'Add Location', description: 'Create new locations (stores/sites) under the org: set name, address, contact info.' },
+    { id: 'subadmin.assignLocation', label: 'Assign Location', description: 'Assign users (managers or sub-admins) to one or more locations so they can place/see tickets there.' },
+    { id: 'subadmin.verifyJobCompleted', label: 'Verify Job Completed', description: 'After a tech marks "Completed," verify the work order and close out the ticket.' },
+    { id: 'subadmin.manageVendors', label: 'Manage Vendors', description: 'Adjust vendor tier/level, approve vendors, change which orgs they can serve.' }
   ];
   
-  // Fallback list of permissions in case data.availablePermissions is not available
-  const defaultPermissions = [
-    { id: 'subadmin.placeTicket', description: 'Create a new maintenance ticket: fill in location, issue type, description, upload media, and submit it.' },
-    { id: 'subadmin.acceptTicket', description: 'Pick up ("accept") an unassigned ticket at Tier 1: you see New tickets and can assign them to vendors.' },
-    { id: 'subadmin.tier2AcceptTicket', description: 'Accept or reassign tickets that have escalated past Tier 1 (i.e. Tier 2 queue).' },
-    { id: 'subadmin.tier3AcceptTicket', description: 'Accept or reassign tickets that have escalated past Tier 2 (i.e. Tier 3 queue).' },
-    { id: 'subadmin.addVendor', description: 'Add a new vendor record to the org: enter name, email, phone, password, and link them to one/multiple orgs.' },
-    { id: 'subadmin.addIssueType', description: 'Extend the "Type of Issue" lookup: add new categories like "Elevator" or "Electrical."' },
-    { id: 'subadmin.acceptInvoice', description: 'Review and approve a vendor-generated invoice before it goes to accounts payable.' },
-    { id: 'subadmin.addLocation', description: 'Create new locations (stores/sites) under the org: set name, address, contact info.' },
-    { id: 'subadmin.assignLocation', description: 'Assign users (managers or sub-admins) to one or more locations so they can place/see tickets there.' },
-    { id: 'subadmin.verifyJobCompleted', description: 'After a tech marks "Completed," verify the work order and close out the ticket.' },
-    { id: 'subadmin.manageVendors', description: 'Adjust vendor tier/level, approve vendors, change which orgs they can serve.' }
-  ];
-  
-  // Get available permissions (from data or fallback)
-  const availablePermissions = data?.availablePermissions || defaultPermissions;
+  // Get available permissions from the availableRoles
+  const availablePermissions = availableRoles;
 
   // Get organization info
   const organization = getOrganization(id);
+  
+  // Fetch vendors for this organization
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        const vendors = await getVendors(id);
+        setOrganizationVendors(vendors || []);
+      } catch (error) {
+        console.error('Error fetching vendors:', error);
+        setOrganizationVendors([]);
+      }
+    };
+    
+    fetchVendors();
+  }, [id, getVendors]);
 
   // Check for stored tab value from localStorage (synced with sidebar navigation)
   const getInitialTab = () => {
@@ -147,9 +169,9 @@ const OrganizationDetailRevised = () => {
     if (window.location.pathname.includes('/vendors')) return 3;
     if (window.location.pathname.includes('/tickets')) return 4;
     
-    // If no URL path match, check localStorage
+    // If no URL path match, check localStorage or default to tickets (4)
     const savedTab = localStorage.getItem('orgDetailTab');
-    return savedTab ? parseInt(savedTab, 10) : 0;
+    return savedTab ? parseInt(savedTab, 10) : 4;
   };
 
   // States
@@ -186,7 +208,7 @@ const OrganizationDetailRevised = () => {
   });
 
   // Fetch vendors for this organization using the getVendors function
-  const organizationVendors = getVendors(id) || [];
+  // Vendors are now fetched via useEffect
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -197,19 +219,16 @@ const OrganizationDetailRevised = () => {
 
     // Navigate to appropriate URL based on tab
     switch (newValue) {
-      case 0: // Overview
-        navigate(`/organizations/${id}`);
-        break;
-      case 1: // Sub-Admins
+      case 0: // Sub-Admins
         navigate(`/organizations/${id}/subadmins`);
         break;
-      case 2: // Locations
+      case 1: // Locations
         navigate(`/organizations/${id}/locations`);
         break;
-      case 3: // Vendors
+      case 2: // Vendors
         navigate(`/organizations/${id}/vendors`);
         break;
-      case 4: // Tickets
+      case 3: // Tickets
         navigate(`/organizations/${id}/tickets`);
         break;
       default:
@@ -223,8 +242,8 @@ const OrganizationDetailRevised = () => {
     
     if (name === 'role') {
       // If role is changed, update permissions based on selected role
-      const selectedRole = userRoleTemplates.find(role => role.name === value);
-      const rolePermissions = selectedRole ? selectedRole.permissions : [];
+      const selectedRole = availableRoles.find(role => role.id === value);
+      const rolePermissions = selectedRole ? [selectedRole.id] : [];
       
       setSubAdminForm(prev => ({
         ...prev,
@@ -247,31 +266,29 @@ const OrganizationDetailRevised = () => {
 
   // Handle permission checkbox change
   const handlePermissionChange = (e) => {
-    const { value, checked } = e.target;
-    
-    // When a role is selected, don't allow changing permissions directly
-    // except for 'Custom Role'
-    if (subAdminForm.role && subAdminForm.role !== 'Custom Role') {
-      return;
-    }
+    const { name, checked } = e.target;
     
     setSubAdminForm(prev => {
-      // Ensure prev.permissions is an array
-      const currentPermissions = Array.isArray(prev.permissions) ? prev.permissions : [];
+      // Ensure permissions is always an array
+      const currentPermissions = Array.isArray(prev.permissions) ? [...prev.permissions] : [];
       
       if (checked) {
-        // Add the permission if it's not already in the array
-        return {
-          ...prev,
-          permissions: currentPermissions.includes(value) ? currentPermissions : [...currentPermissions, value]
-        };
+        // Add permission if checked
+        if (!currentPermissions.includes(name)) {
+          return {
+            ...prev,
+            permissions: [...currentPermissions, name]
+          };
+        }
       } else {
-        // Remove the permission
+        // Remove permission if unchecked
         return {
           ...prev,
-          permissions: currentPermissions.filter(p => p !== value)
+          permissions: currentPermissions.filter(p => p !== name)
         };
       }
+      
+      return prev; // No change needed
     });
   };
 
@@ -344,8 +361,11 @@ const OrganizationDetailRevised = () => {
     return Object.keys(errors).length === 0;
   };
   
-
-
+  // Handle form reset for both forms
+  useEffect(() => {
+    // Initialize forms if needed
+  }, []);
+  
   // Submit sub-admin form
   const handleSubAdminSubmit = () => {
     if (validateSubAdminForm()) {
@@ -356,7 +376,7 @@ const OrganizationDetailRevised = () => {
         phone: subAdminForm.phone,
         password: subAdminForm.password,
         permissions: subAdminForm.permissions,
-        role: subAdminForm.role || 'Custom Role', // Default to custom role if none selected
+        role: 'subadmin', // Simplified role handling
         organizationId: id
       };
       
@@ -399,21 +419,28 @@ const OrganizationDetailRevised = () => {
 
   
   // Handle update vendor
-  const handleUpdateVendor = () => {
+  const handleUpdateVendor = async () => {
     try {
       if (selectedVendor) {
-        // Update only tier and status
-        updateVendor(selectedVendor.id, {
-          ...selectedVendor,
+        // Update only tier and status - don't include the entire vendor object
+        await updateVendor(selectedVendor.id, {
           tier: vendorForm.tier,
           status: vendorForm.status
         });
+        
+        // Refresh vendors data after update
+        const vendors = await getVendors(id);
+        setOrganizationVendors(vendors || []);
+        
+        // Show success message or indicator here if desired
+        console.log('Vendor updated successfully');
         
         setVendorDialog(false);
       }
     } catch (error) {
       console.error('Error updating vendor:', error);
       setFormErrors(prev => ({ ...prev, vendorUpdate: error.message }));
+      alert(`Error updating vendor: ${error.message}`);
     }
   };
 
@@ -445,261 +472,8 @@ const OrganizationDetailRevised = () => {
       </Typography>
       
       <Paper sx={{ mt: 3 }}>
-        <Tabs
-          value={value}
-          onChange={handleTabChange}
-          aria-label="organization tabs"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab label="Overview" id="org-tab-0" aria-controls="org-tabpanel-0" />
-          <Tab label="Sub-Admins" id="org-tab-1" aria-controls="org-tabpanel-1" />
-          <Tab label="Locations" id="org-tab-2" aria-controls="org-tabpanel-2" />
-          <Tab label="Vendors" id="org-tab-3" aria-controls="org-tabpanel-3" />
-          <Tab label="Tickets" id="org-tab-4" aria-controls="org-tabpanel-4" />
-        </Tabs>
         
         <TabPanel value={value} index={0}>
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" gutterBottom>Organization Summary</Typography>
-            <Grid container spacing={2}>
-              {/* Sub-Admin Count */}
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: 120,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': { boxShadow: 6 }
-                  }}
-                  onClick={() => navigate(`/organizations/${id}/subadmins`)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ mb: 1 }}>
-                        {organization.subAdmins?.length || 0}
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary">Sub-Admins</Typography>
-                    </Box>
-                    <PersonIcon color="primary" fontSize="large" />
-                  </Box>
-                  <Box sx={{ mt: 'auto', pt: 1, display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" color="primary" sx={{ mr: 0.5 }}>
-                      View All Sub-Admins
-                    </Typography>
-                    <ArrowBackIcon sx={{ fontSize: '1rem', transform: 'rotate(180deg)' }} color="primary" />
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              {/* Locations Count */}
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: 120,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': { boxShadow: 6 }
-                  }}
-                  onClick={() => navigate(`/organizations/${id}/locations`)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ mb: 1 }}>
-                        {organization.locations?.length || 0}
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary">Locations</Typography>
-                    </Box>
-                    <LocationIcon color="primary" fontSize="large" />
-                  </Box>
-                  <Box sx={{ mt: 'auto', pt: 1, display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" color="primary" sx={{ mr: 0.5 }}>
-                      View All Locations
-                    </Typography>
-                    <ArrowBackIcon sx={{ fontSize: '1rem', transform: 'rotate(180deg)' }} color="primary" />
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              {/* Vendors Count */}
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: 120,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': { boxShadow: 6 }
-                  }}
-                  onClick={() => {
-                    // Store tab index 3 (Vendors) in localStorage to align with sidebar menu
-                    localStorage.setItem('orgDetailTab', '3');
-                    navigate(`/organizations/${id}/vendors`);
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ mb: 1 }}>
-                        {organizationVendors.length}
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary">Vendors</Typography>
-                    </Box>
-                    <VendorIcon color="primary" fontSize="large" />
-                  </Box>
-                  <Box sx={{ mt: 'auto', pt: 1, display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" color="primary" sx={{ mr: 0.5 }}>
-                      View All Vendors
-                    </Typography>
-                    <ArrowBackIcon sx={{ fontSize: '1rem', transform: 'rotate(180deg)' }} color="primary" />
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              {/* Tickets Count */}
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: 120,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': { boxShadow: 6 }
-                  }}
-                  onClick={() => navigate(`/organizations/${id}/tickets`)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ mb: 1 }}>
-                        {organization.tickets?.length || 0}
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary">Tickets</Typography>
-                    </Box>
-                    <TicketIcon color="primary" fontSize="large" />
-                  </Box>
-                  <Box sx={{ mt: 'auto', pt: 1, display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="body2" color="primary" sx={{ mr: 0.5 }}>
-                      View All Tickets
-                    </Typography>
-                    <ArrowBackIcon sx={{ fontSize: '1rem', transform: 'rotate(180deg)' }} color="primary" />
-                  </Box>
-                </Paper>
-              </Grid>
-            </Grid>
-          </Box>
-          
-          {/* Recent Activity */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" gutterBottom>Recent Activity</Typography>
-            <Paper sx={{ p: 2 }}>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Description</TableCell>
-                      <TableCell>Location</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Status</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {organization.recentActivity ? (
-                      organization.recentActivity.map((activity) => (
-                        <TableRow key={activity.id}>
-                          <TableCell>{activity.type}</TableCell>
-                          <TableCell>{activity.description}</TableCell>
-                          <TableCell>{activity.location}</TableCell>
-                          <TableCell>{activity.date}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={activity.status} 
-                              size="small"
-                              color={
-                                activity.status === 'Completed' ? 'success' :
-                                activity.status === 'In Progress' ? 'primary' :
-                                activity.status === 'Pending' ? 'warning' : 'default'
-                              }
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} align="center">
-                          <Typography color="text.secondary">No recent activity to display</Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          </Box>
-          
-          {/* Quick Actions */}
-          <Box>
-            <Typography variant="h6" gutterBottom>Quick Actions</Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={6} sm={3}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={() => setSubAdminDialog(true)}
-                  sx={{ py: 1.5 }}
-                >
-                  Add Sub-Admin
-                </Button>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={() => setLocationDialog(true)}
-                  sx={{ py: 1.5 }}
-                >
-                  Add Location
-                </Button>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<TicketIcon />}
-                  sx={{ py: 1.5 }}
-                >
-                  New Ticket
-                </Button>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  sx={{ py: 1.5 }}
-                >
-                  Edit Org Info
-                </Button>
-              </Grid>
-            </Grid>
-          </Box>
-        </TabPanel>
-        
-        <TabPanel value={value} index={1}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h6">Sub-Administrators</Typography>
             <Button 
@@ -743,7 +517,7 @@ const OrganizationDetailRevised = () => {
           </Grid>
         </TabPanel>
         
-        <TabPanel value={value} index={2}>
+        <TabPanel value={value} index={1}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h6">Locations</Typography>
             <Button 
@@ -790,7 +564,7 @@ const OrganizationDetailRevised = () => {
           </Grid>
         </TabPanel>
         
-        <TabPanel value={value} index={3}>
+        <TabPanel value={value} index={2}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h6">Vendor Relationships</Typography>
             <Box>
@@ -879,8 +653,8 @@ const OrganizationDetailRevised = () => {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2">{vendor.email}</Typography>
-                            <Typography variant="body2" color="text.secondary">{vendor.phone}</Typography>
+                            <Typography variant="body2">{formatEmail(vendor.email)}</Typography>
+                            <Typography variant="body2" color="text.secondary">{formatPhoneNumber(vendor.phone)}</Typography>
                           </TableCell>
                           <TableCell align="center">
                             <Chip 
@@ -941,7 +715,7 @@ const OrganizationDetailRevised = () => {
           )}
         </TabPanel>
         
-        <TabPanel value={value} index={4}>
+        <TabPanel value={value} index={3}>
           <Typography variant="h6" gutterBottom>Tickets</Typography>
           <Typography>
             View and manage maintenance tickets for this organization.
@@ -1012,82 +786,42 @@ const OrganizationDetailRevised = () => {
             helperText={formErrors.password}
           />
           
-          <FormControl fullWidth margin="normal">
-            <InputLabel id="role-label">Role</InputLabel>
-            <Select
-              labelId="role-label"
-              id="role"
-              name="role"
-              value={subAdminForm.role}
-              onChange={handleSubAdminInputChange}
-              label="Role"
-            >
-              <MenuItem value=""><em>Select a role</em></MenuItem>
-              {userRoleTemplates.map((role) => (
-                <MenuItem key={role.name} value={role.name}>
-                  <Box>
-                    <Typography variant="body1">{role.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{role.description}</Typography>
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-            <FormHelperText>
-              Select a predefined role or choose "Custom Role" to set individual permissions
-            </FormHelperText>
-          </FormControl>
-          
-          <Typography variant="h6" gutterBottom sx={{ mt: 3, mb: 2 }}>
-            Permissions
-          </Typography>
-          
-          {(subAdminForm.role === 'Custom Role' || !subAdminForm.role) && (!Array.isArray(subAdminForm.permissions) || subAdminForm.permissions.length === 0) && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Please select at least one permission for this sub-administrator
-            </Alert>
-          )}
-          
-          <Grid container spacing={1}>
-            {availablePermissions.map((permission) => (
-              <Grid item xs={12} sm={6} key={permission.id}>
-                <Box 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'flex-start', 
-                    border: '1px solid #e0e0e0',
-                    borderRadius: 1,
-                    p: 1.5,
-                    mb: 2,
-                    bgcolor: Array.isArray(subAdminForm.permissions) && subAdminForm.permissions.includes(permission.id) ? 'rgba(0, 128, 128, 0.08)' : 'transparent',
-                    '&:hover': {
-                      bgcolor: 'rgba(0, 128, 128, 0.04)'
+          {/* Role permissions section - matches SubAdmins.js format */}
+          <FormControl component="fieldset" fullWidth margin="normal" sx={{ mt: 3 }}>
+            <FormLabel component="legend">Role Permissions</FormLabel>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
+              Select the permissions this sub-admin should have:
+            </Typography>
+            
+            {(!Array.isArray(subAdminForm.permissions) || subAdminForm.permissions.length === 0) && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Please select at least one permission for this sub-administrator
+              </Alert>
+            )}
+            
+            <FormGroup>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
+                {availableRoles.map(role => (
+                  <FormControlLabel
+                    key={role.id}
+                    control={
+                      <Checkbox
+                        checked={Array.isArray(subAdminForm.permissions) && subAdminForm.permissions.includes(role.id)}
+                        onChange={handlePermissionChange}
+                        name={role.id}
+                      />
                     }
-                  }}
-                >
-                  <Checkbox
-                    checked={Array.isArray(subAdminForm.permissions) && subAdminForm.permissions.includes(permission.id)}
-                    onChange={(e) => handlePermissionChange(e)}
-                    value={permission.id}
-                    name="permissions"
-                    disabled={subAdminForm.role && subAdminForm.role !== 'Custom Role'}
+                    label={
+                      <Box>
+                        <Typography variant="body2">{role.label}</Typography>
+                        <Typography variant="caption" color="text.secondary">{role.description}</Typography>
+                      </Box>
+                    }
                   />
-                  <Box sx={{ ml: 1, flexGrow: 1 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: Array.isArray(subAdminForm.permissions) && subAdminForm.permissions.includes(permission.id) ? 'bold' : 'normal' }}>
-                      {permission.id.replace('subadmin.', '').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {permission.description}
-                    </Typography>
-                  </Box>
-                  <Tooltip title={permission.description}>
-                    <IconButton size="small">
-                      <InfoIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
+                ))}
+              </Box>
+            </FormGroup>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSubAdminDialog(false)}>Cancel</Button>

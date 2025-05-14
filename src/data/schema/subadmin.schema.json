@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SubAdmin",
+  "description": "Schema for subadmin data in the maintenance application",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the subadmin (UUID)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the subadmin"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email address of the subadmin (used for login)"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "organizationId": {
+      "type": "string",
+      "description": "ID of the organization this subadmin belongs to"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "pending"],
+      "description": "Current status of the subadmin account"
+    },
+    "securityGroupIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of security groups assigned to this subadmin"
+    },
+    "directPermissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Direct permission IDs granted to this subadmin (in addition to security groups)"
+    },
+    "locationIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of locations this subadmin is assigned to"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the subadmin was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the subadmin was last updated"
+    }
+  },
+  "required": ["id", "name", "email", "organizationId", "status", "createdAt", "updatedAt"],
+  "additionalProperties": false
+}

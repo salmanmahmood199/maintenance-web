@@ -66,7 +66,10 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Layout>
-                      <OrganizationDetailRevised />
+                      <Navigate to={(location) => {
+                        const id = location.pathname.split('/').pop();
+                        return `/organizations/${id}/tickets`;
+                      }} replace />
                     </Layout>
                   </ProtectedRoute>
                 } 

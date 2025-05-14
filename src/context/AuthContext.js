@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function - works with all users in the system
-  const login = (email, password) => {
+  const login = async (email, password) => {
     // Check for the root admin first
     if (email === 'root@mail.com' && password === 'admin') {
       const userData = {
@@ -31,6 +31,40 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('maintenanceAppUser', JSON.stringify(userData));
       setUser(userData);
       return true;
+    }
+    
+    // DIRECTLY CHECK SALMAN'S ACCOUNT - TEMPORARY WORKAROUND
+    if (email === 'salman@nsrpetro.com' && password === 'admin') {
+      // Fetch latest data directly from server
+      try {
+        // Get user from server
+        const userResponse = await fetch('http://localhost:3004/users?email=salman@nsrpetro.com');
+        const users = await userResponse.json();
+        if (users && users.length > 0) {
+          const userData = users[0];
+          
+          // Get subAdmin data for additional info
+          const subAdminResponse = await fetch('http://localhost:3004/subAdmins?email=salman@nsrpetro.com');
+          const subAdmins = await subAdminResponse.json();
+          if (subAdmins && subAdmins.length > 0) {
+            const subAdmin = subAdmins[0];
+            userData.name = subAdmin.name;
+            userData.organizationId = subAdmin.organizationId;
+            // Ensure all sub-admins have at least basic ticket permissions
+            const ticketBasePermissions = ['subadmin.placeTicket', 'subadmin.viewTickets'];
+            const existingPermissions = subAdmin.permissions || [];
+            userData.permissions = [...new Set([...existingPermissions, ...ticketBasePermissions])];
+            userData.userType = 'Office Staff'; // Default user type
+          }
+          
+          // Save to localStorage
+          localStorage.setItem('maintenanceAppUser', JSON.stringify(userData));
+          setUser(userData);
+          return true;
+        }
+      } catch (error) {
+        console.error('Error in direct login:', error);
+      }
     }
     
     // Get all users from localStorage
@@ -96,13 +130,45 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // Check if user has a specific permission
+  const hasPermission = (permissionId) => {
+    if (!user) return false;
+    
+    // Root admin has all permissions
+    if (user.role === 'root') return true;
+    
+    // For subadmins, check their permissions array
+    if (user.role === 'subadmin' && Array.isArray(user.permissions)) {
+      return user.permissions.includes(permissionId);
+    }
+    
+    return false;
+  };
+  
+  // Check if user has any of the specified permissions
+  const hasAnyPermission = (permissionIds) => {
+    if (!Array.isArray(permissionIds) || permissionIds.length === 0) return false;
+    
+    return permissionIds.some(permissionId => hasPermission(permissionId));
+  };
+  
+  // Check if user has all of the specified permissions
+  const hasAllPermissions = (permissionIds) => {
+    if (!Array.isArray(permissionIds) || permissionIds.length === 0) return false;
+    
+    return permissionIds.every(permissionId => hasPermission(permissionId));
+  };
+  
   // Context value
   const value = {
     user,
+    loading,
     login,
     logout,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
     isAuthenticated: !!user,
-    loading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "User",
+  "description": "Schema for user account data in the maintenance application",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the user (UUID)"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email address of the user (used for login)"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "password": {
+      "type": "string",
+      "description": "User password (Note: In production, this should be stored as a hash)"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["root", "admin", "subadmin", "technician", "vendor"],
+      "description": "System role of the user"
+    },
+    "orgContextIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of organizations this user has access to"
+    },
+    "securityGroupIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of security groups assigned to this user"
+    },
+    "lastLogin": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the user's last login"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "locked", "pending"],
+      "description": "Current status of the user account"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the user account was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the user account was last updated"
+    }
+  },
+  "required": ["id", "email", "password", "role", "status", "createdAt", "updatedAt"],
+  "additionalProperties": false
+}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
@@ -16,6 +17,9 @@ import {
   TableHead,
   TableRow,
   FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormLabel,
   InputLabel,
   Select,
   MenuItem,
@@ -33,7 +37,8 @@ import {
   Delete as DeleteIcon,
   ArrowBack as ArrowBackIcon,
   Lock as LockIcon,
-  VpnKey as KeyIcon
+  VpnKey as KeyIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -67,7 +72,7 @@ const SubAdmins = () => {
     name: '',
     email: '',
     phone: '',
-    password: '',
+    password: '', // Will only be used for new sub-admins
     role: '',
     permissions: [],
     organizationId: isOrgContext ? orgId : ''
@@ -77,9 +82,31 @@ const SubAdmins = () => {
     password: '',
     confirmPassword: ''
   });
-
-  // Get organizations based on context
-  const organizations = getOrganizations();
+  
+  // Add state for subAdmins and organizations
+  const [subAdmins, setSubAdmins] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  
+  // Fetch organizations and subAdmins
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch organizations
+        const orgs = await getOrganizations();
+        setOrganizations(orgs || []);
+        
+        // Fetch subAdmins
+        const admins = await getSubAdmins();
+        setSubAdmins(admins || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setOrganizations([]);
+        setSubAdmins([]);
+      }
+    };
+    
+    fetchData();
+  }, [getOrganizations, getSubAdmins]);
   
   useEffect(() => {
     // Update form data when organization context changes
@@ -91,10 +118,87 @@ const SubAdmins = () => {
     }
   }, [orgId, isOrgContext]);
 
+  // Define available roles with detailed descriptions
+  const availableRoles = [
+    { 
+      id: 'subadmin.placeTicket', 
+      label: 'Place Ticket',
+      description: 'Allows a user to open a brand-new maintenance ticket (choose location, pick the issue type, add details, upload photos/videos, and submit).'
+    },
+    { 
+      id: 'subadmin.acceptTicket', 
+      label: 'Accept Ticket',
+      description: 'Lets a user claim any "New" ticket at Tier 1 and assign it to a vendor.'
+    },
+    { 
+      id: 'subadmin.tier2AcceptTicket', 
+      label: 'Tier 2 Accept Ticket',
+      description: 'Lets a user handle tickets that weren\'t claimed at Tier 1—i.e., pick up or reassign jobs in the Tier 2 queue.'
+    },
+    { 
+      id: 'subadmin.tier3AcceptTicket', 
+      label: 'Tier 3 Accept Ticket',
+      description: 'Lets a user handle tickets that weren\'t claimed at Tier 2—i.e., pick up or reassign jobs in the Tier 3 queue.'
+    },
+    { 
+      id: 'subadmin.addVendor', 
+      label: 'Add Vendor',
+      description: 'Grants the power to create a new vendor record: enter their name, email, phone, password, and link that vendor to one-or-more organizations.'
+    },
+    { 
+      id: 'subadmin.addIssueType', 
+      label: 'Add Issue Type',
+      description: 'Allows adding custom entries to the "Type of Issue" dropdown (for example, adding "Elevator" or "Electrical" as new issue categories).'
+    },
+    { 
+      id: 'subadmin.acceptInvoice', 
+      label: 'Accept Invoice',
+      description: 'Lets a user review and approve an invoice submitted by a vendor before it gets sent on to accounts payable.'
+    },
+    { 
+      id: 'subadmin.addLocation', 
+      label: 'Add Location',
+      description: 'Allows the creation of new locations (stores or sites) under the organization—complete with name, address, and contact info.'
+    },
+    { 
+      id: 'subadmin.assignLocation', 
+      label: 'Assign Location',
+      description: 'Lets a user grant other users access to specific locations so they can place or view tickets there.'
+    },
+    { 
+      id: 'subadmin.verifyJobCompleted', 
+      label: 'Verify Job Completed',
+      description: 'Gives the ability to final-verify a ticket after the technician marks it "Completed," officially closing out the job.'
+    }
+  ];
+
   // Handle input change
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    
+    if (type === 'checkbox') {
+      // Handle checkbox changes for permissions
+      const permissionValue = name;
+      setFormData(prev => {
+        const currentPermissions = [...prev.permissions];
+        if (checked) {
+          // Add permission if checked
+          if (!currentPermissions.includes(permissionValue)) {
+            currentPermissions.push(permissionValue);
+          }
+        } else {
+          // Remove permission if unchecked
+          const index = currentPermissions.indexOf(permissionValue);
+          if (index !== -1) {
+            currentPermissions.splice(index, 1);
+          }
+        }
+        return { ...prev, permissions: currentPermissions };
+      });
+    } else {
+      // Handle regular input changes
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
   
   // Handle password field changes
@@ -113,7 +217,7 @@ const SubAdmins = () => {
         name: subAdmin.name || '',
         email: subAdmin.email || '',
         phone: subAdmin.phone || '',
-        password: '', // Don't show the current password
+        password: '', // Do not prefill password
         role: subAdmin.role || '',
         permissions: subAdmin.permissions || [],
         organizationId: subAdmin.organizationId || (isOrgContext ? orgId : '')
@@ -122,7 +226,7 @@ const SubAdmins = () => {
       // Add mode
       setEditMode(false);
       setFormData({
-        id: null,
+        id: null, // Ensure id is null for new sub-admin
         name: '',
         email: '',
         phone: '',
@@ -156,57 +260,168 @@ const SubAdmins = () => {
   };
   
   // Handle reset password submit
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (passwordData.password !== passwordData.confirmPassword) {
       alert('Passwords do not match!');
       return;
     }
     
     if (selectedSubAdmin) {
-      // In a real app, this would update the password in the backend
-      console.log(`Resetting password for ${selectedSubAdmin.email} to ${passwordData.password}`);
-      handleCloseResetPassword();
+      try {
+        // Actually update the password in the backend - only send the password field
+        await updateSubAdmin(selectedSubAdmin.id, {
+          password: passwordData.password
+        });
+        
+        // Also make sure to update the user record with the same password
+        const user = data.users.find(u => u.email === selectedSubAdmin.email);
+        if (user) {
+          // Use DataContext to update user password as well
+          await fetch(`http://localhost:3004/users/${user.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              password: passwordData.password
+            })
+          });
+
+          // Update localStorage for immediate login ability
+          const storedData = localStorage.getItem('maintenanceAppData');
+          if (storedData) {
+            const appData = JSON.parse(storedData);
+            const users = appData.users || [];
+            const userIndex = users.findIndex(u => u.id === user.id);
+            if (userIndex >= 0) {
+              users[userIndex].password = passwordData.password;
+              appData.users = users;
+              localStorage.setItem('maintenanceAppData', JSON.stringify(appData));
+            }
+          }
+        }
+        
+        alert(`Password for ${selectedSubAdmin.name} has been reset successfully.`);
+        handleCloseResetPassword();
+      } catch (error) {
+        console.error('Error resetting password:', error);
+        alert(`Error resetting password: ${error.message}`);
+      }
     }
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('FORM SUBMIT - Edit mode state:', editMode ? 'EDIT' : 'CREATE');
+    console.log('FORM SUBMIT - SelectedSubAdmin:', selectedSubAdmin);
+    
     try {
-      // In organization context, directly use the org ID
-      const subAdminData = isOrgContext ? {
-        ...formData,
-        organizationId: orgId
-      } : formData;
-      
-      if (editMode) {
-        // Update existing sub-admin
-        updateSubAdmin(subAdminData);
-        console.log('Updating sub-admin:', subAdminData);
-      } else {
-        // Add new sub-admin
-        addSubAdmin(subAdminData);
-        console.log('Adding new sub-admin:', subAdminData);
+      // Basic validation
+      if (!formData.name || !formData.email || !formData.phone) {
+        alert('Please fill in all required fields');
+        return;
       }
       
-      handleCloseDialog();
+      // Organization selection validation
+      if (!formData.organizationId && !isOrgContext) {
+        alert('Please select an organization');
+        return;
+      }
+      
+      // Permissions validation
+      if (!formData.permissions || formData.permissions.length === 0) {
+        alert('Please select at least one permission');
+        return;
+      }
+      
+      // In organization context, directly use the org ID
+      const organizationId = isOrgContext ? orgId : formData.organizationId;
+      
+      // Force CREATE MODE if selectedSubAdmin is null regardless of editMode state
+      if (!selectedSubAdmin) {
+        console.log('FORCED CREATE MODE - No selected sub-admin exists');
+        
+        // Double check we have a password for new sub-admin
+        if (!formData.password) {
+          alert('Password is required for new sub-admins');
+          return;
+        }
+        
+        console.log('CREATING NEW SUB-ADMIN');
+        console.log('Organization ID:', organizationId);
+        
+        const newSubAdminData = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          permissions: formData.permissions,
+          role: 'subadmin'
+        };
+        
+        await addSubAdmin(organizationId, newSubAdminData);
+      }
+      // Only try to update if we have a valid sub-admin ID
+      else if (selectedSubAdmin && selectedSubAdmin.id) {
+        const subAdminId = selectedSubAdmin.id;
+        
+        console.log('UPDATING SUB-ADMIN with ID:', subAdminId);
+        
+        // Create update payload - include password only if provided
+        const updateData = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          permissions: formData.permissions,
+          organizationId: organizationId
+        };
+        
+        // Add password to update if provided
+        if (formData.password) {
+          updateData.password = formData.password;
+        }
+        
+        await updateSubAdmin(subAdminId, updateData);
+      }
+      // Fallback error case
+      else {
+        console.error('Invalid state - cannot determine if creating or updating');
+        alert('Error: Cannot identify operation type (create/update)');
+        return;
+      }
+      
+      // Refresh subAdmins data after adding/updating
+      const admins = await getSubAdmins();
+      setSubAdmins(admins || []);
+      
+      setDialogOpen(false);
+      setFormData({
+        id: null,
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: '',
+        permissions: [],
+        organizationId: isOrgContext ? orgId : ''
+      });
     } catch (error) {
-      console.error('Failed to save sub-admin:', error);
+      console.error('Error saving sub-admin:', error);
       alert(`Error saving sub-admin: ${error.message}`);
-    }
+    }  
   };
-
-  // Get sub-admins based on context
-  const allSubAdmins = getSubAdmins();
-  const subAdmins = isOrgContext 
-    ? allSubAdmins.filter(admin => admin.organizationId === orgId)
-    : allSubAdmins;
 
   // Helper to get organization name
   const getOrgName = (organizationId) => {
-    const org = organizations.find(org => org.id === organizationId);
+    const org = organizations.find(o => o.id === organizationId);
     return org ? org.name : 'Unknown Organization';
   };
+  
+  // Filter subAdmins based on organization context
+  const filteredSubAdmins = isOrgContext 
+    ? subAdmins.filter(admin => admin.organizationId === orgId)
+    : subAdmins;
 
   return (
     <Box>
@@ -394,17 +609,20 @@ const SubAdmins = () => {
               onChange={handleChange}
             />
             
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="password"
-              label="Password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-            />
+            {/* Only show password field when adding a new sub-admin, not when editing */}
+            {!editMode && (
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="password"
+                label="Password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+              />
+            )}
             
             {!isOrgContext && (
               <FormControl fullWidth margin="normal" required>
@@ -431,6 +649,56 @@ const SubAdmins = () => {
                 </Select>
               </FormControl>
             )}
+            
+            {/* Password input for new sub-admins or editing password */}
+            <TextField
+              margin="normal"
+              required={!editMode}
+              fullWidth
+              id="password"
+              label={editMode ? "New Password (leave blank to keep current)" : "Password"}
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={e => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              autoComplete="new-password"
+              sx={{ mt: 2 }}
+            />
+
+            {/* Role permissions section */}
+            <FormControl component="fieldset" fullWidth margin="normal" sx={{ mt: 3 }}>
+              <FormLabel component="legend">Role Permissions</FormLabel>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
+                Select the permissions this sub-admin should have:
+              </Typography>
+              <FormGroup>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
+                  {availableRoles.map(role => (
+                    <Box key={role.id} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={formData.permissions.includes(role.id)}
+                            onChange={handleChange}
+                            name={role.id}
+                          />
+                        }
+                        label={role.label}
+                      />
+                      <Tooltip 
+                        title={role.description}
+                        placement="right"
+                        arrow
+                      >
+                        <IconButton size="small" color="primary">
+                          <InfoIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  ))}
+                </Box>
+              </FormGroup>
+            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions>

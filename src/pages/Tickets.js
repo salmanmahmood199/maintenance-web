@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -94,10 +94,36 @@ const Tickets = () => {
     mediaUrls: [] // Placeholder for future file uploads
   });
 
-  // Get data 
-  const tickets = getTickets();
-  const locations = getLocations();
-  const vendors = getVendors();
+  // Add state for storing async data
+  const [tickets, setTickets] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  
+  // Fetch data when component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch all data in parallel
+        const [ticketsData, locationsData, vendorsData] = await Promise.all([
+          getTickets(),
+          getLocations(),
+          getVendors()
+        ]);
+        
+        // Update state with fetched data
+        setTickets(ticketsData || []);
+        setLocations(locationsData || []);
+        setVendors(vendorsData || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setTickets([]);
+        setLocations([]);
+        setVendors([]);
+      }
+    };
+    
+    fetchData();
+  }, [getTickets, getLocations, getVendors]);
 
   // Handle input change
   const handleChange = (e) => {
@@ -120,10 +146,20 @@ const Tickets = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    addTicket(formData);
-    handleCloseDialog();
+    try {
+      await addTicket(formData);
+      
+      // Refresh tickets data after adding a new one
+      const newTickets = await getTickets();
+      setTickets(newTickets || []);
+      
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Error adding ticket:', error);
+      alert(`Error adding ticket: ${error.message}`);
+    }
   };
 
   // Open ticket detail drawer
@@ -172,32 +208,44 @@ const Tickets = () => {
   };
 
   // Handle action submission
-  const handleActionSubmit = () => {
+  const handleActionSubmit = async () => {
     if (!selectedTicket) return;
     
-    switch (actionType) {
-      case 'assign':
-        assignTicket(selectedTicket.id, selectedVendor);
-        break;
-      case 'start':
-        startWork(selectedTicket.id);
-        break;
-      case 'pause':
-        pauseWork(selectedTicket.id, actionNote);
-        break;
-      case 'complete':
-        completeWork(selectedTicket.id, actionNote);
-        break;
-      case 'verify':
-        verifyCompletion(selectedTicket.id, user?.email);
-        break;
-      default:
-        break;
+    try {
+      switch (actionType) {
+        case 'assign':
+          await assignTicket(selectedTicket.id, selectedVendor);
+          break;
+        case 'start':
+          await startWork(selectedTicket.id);
+          break;
+        case 'pause':
+          await pauseWork(selectedTicket.id, actionNote);
+          break;
+        case 'complete':
+          await completeWork(selectedTicket.id, actionNote);
+          break;
+        case 'verify':
+          await verifyCompletion(selectedTicket.id);
+          break;
+        default:
+          break;
+      }
+      
+      // Refresh tickets data after action
+      const newTickets = await getTickets();
+      setTickets(newTickets || []);
+      
+      // Get updated ticket info
+      const updatedTicket = await getTicket(selectedTicket.id);
+      setSelectedTicket(updatedTicket);
+      
+      handleCloseActionDialog();
+    } catch (error) {
+      console.error(`Error processing ${actionType} action:`, error);
+      alert(`Error: ${error.message}`);
+      handleCloseActionDialog();
     }
-    
-    // Update selected ticket
-    setSelectedTicket(getTicket(selectedTicket.id));
-    handleCloseActionDialog();
   };
 
   // Render action buttons based on ticket status

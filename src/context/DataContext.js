@@ -386,27 +386,27 @@ export const DataProvider = ({ children }) => {
   // SubAdmin management with direct permissions
   const addSubAdmin = (organizationId, subadminData) => {
     const { name, email, phone, password, permissions } = subadminData;
-    
+
     // Validate email uniqueness
     if (!isEmailUnique(email)) {
       throw new Error('Email is already in use');
     }
-    
+
     // Validate phone uniqueness
     if (!isPhoneUnique(phone)) {
       throw new Error('Phone number is already in use');
     }
-    
+
     // Validate password strength
     if (!isPasswordStrong(password)) {
       throw new Error('Password does not meet strength requirements');
     }
-    
+
     // Validate permissions
     if (!permissions || !Array.isArray(permissions) || permissions.length === 0) {
       throw new Error('At least one permission must be selected');
     }
-    
+
     const newSubAdmin = {
       id: 'sa' + Date.now(),
       name,
@@ -417,7 +417,7 @@ export const DataProvider = ({ children }) => {
       organizationId,
       permissions
     };
-    
+
     // Add user record
     addItem('users', {
       id: uuidv4(),
@@ -428,10 +428,10 @@ export const DataProvider = ({ children }) => {
       orgContextIds: [organizationId],
       permissions: permissions
     });
-    
+
     // Add to subAdmins collection
     const addedSubAdmin = addItem('subAdmins', newSubAdmin);
-    
+
     // Update organization to include this sub-admin
     const organization = getItem('organizations', organizationId);
     if (organization) {
@@ -441,13 +441,14 @@ export const DataProvider = ({ children }) => {
       };
       updateItem('organizations', organizationId, updatedOrg);
     }
-    
+
     return addedSubAdmin;
   };
-  
+
   const updateSubAdmin = (id, subAdmin) => {
     const existingSubAdmin = getItem('subAdmins', id);
     if (!existingSubAdmin) throw new Error('Sub-admin not found');
+
     
     // Find associated user
     const user = data.users.find(u => u.email === existingSubAdmin.email);

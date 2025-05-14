@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -24,23 +24,33 @@ import { Add as AddIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 
-const SUBSCRIPTION_PLANS = [
-  { value: 'basic', label: 'Basic' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'premium', label: 'Premium' }
-];
 
 const Organizations = () => {
   const navigate = useNavigate();
   const { getOrganizations, addOrganization } = useData();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [organizations, setOrganizations] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     contactName: '',
     contactEmail: '',
-    contactPhone: '',
-    plan: 'basic'
+    contactPhone: ''
   });
+  
+  // Fetch organizations when component mounts
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        const data = await getOrganizations();
+        setOrganizations(data || []);
+      } catch (error) {
+        console.error('Error fetching organizations:', error);
+        setOrganizations([]);
+      }
+    };
+    
+    fetchOrganizations();
+  }, [getOrganizations]);
 
   // Handle input change
   const handleChange = (e) => {
@@ -53,21 +63,20 @@ const Organizations = () => {
   const handleCloseDialog = () => setDialogOpen(false);
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    addOrganization(formData);
+    await addOrganization(formData);
     setFormData({
       name: '',
       contactName: '',
       contactEmail: '',
-      contactPhone: '',
-      plan: 'basic'
+      contactPhone: ''
     });
+    // Refresh organizations after adding a new one
+    const updatedOrgs = await getOrganizations();
+    setOrganizations(updatedOrgs || []);
     handleCloseDialog();
   };
-
-  // Get all organizations
-  const organizations = getOrganizations();
 
   return (
     <Box>
@@ -93,7 +102,6 @@ const Organizations = () => {
               <TableCell>Contact Name</TableCell>
               <TableCell>Contact Email</TableCell>
               <TableCell>Contact Phone</TableCell>
-              <TableCell>Subscription Plan</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -116,9 +124,6 @@ const Organizations = () => {
                   <TableCell>{org.contactName}</TableCell>
                   <TableCell>{org.contactEmail}</TableCell>
                   <TableCell>{org.contactPhone}</TableCell>
-                  <TableCell>
-                    {SUBSCRIPTION_PLANS.find(plan => plan.value === org.plan)?.label || 'Unknown'}
-                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -172,23 +177,7 @@ const Organizations = () => {
               value={formData.contactPhone}
               onChange={handleChange}
             />
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="plan-label">Subscription Plan</InputLabel>
-              <Select
-                labelId="plan-label"
-                id="plan"
-                name="plan"
-                value={formData.plan}
-                label="Subscription Plan"
-                onChange={handleChange}
-              >
-                {SUBSCRIPTION_PLANS.map((plan) => (
-                  <MenuItem key={plan.value} value={plan.value}>
-                    {plan.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+
           </Box>
         </DialogContent>
         <DialogActions>

@@ -15,7 +15,8 @@ import {
   Button,
   useMediaQuery,
   useTheme,
-  Collapse
+  Collapse,
+  Tooltip
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -28,11 +29,16 @@ import {
   AssignmentLate as TicketIcon,
   ExitToApp as LogoutIcon,
   Home as HomeIcon,
-  StorefrontOutlined as VendorIcon
+  StorefrontOutlined as VendorIcon,
+  ReceiptLong as InvoiceIcon,
+  CategoryOutlined as IssueTypeIcon,
+  LockOutlined as NoAccessIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import PermissionGuard from './PermissionGuard';
+import { menuPermissionMap } from '../utils/permissionUtils';
 
 // Drawer width
 const drawerWidth = 240;
@@ -81,31 +87,50 @@ const Layout = ({ children }) => {
       text: 'Overview', 
       icon: <DashboardIcon />, 
       path: `/organizations/${params.id}`,
-      tabIndex: 0 // Maps to the Overview tab
+      tabIndex: 0, // Maps to the Overview tab
+      permissionKey: 'org.overview' // Available to all authenticated users
     },
     { 
       text: 'Sub-Admins', 
       icon: <PersonIcon />, 
       path: `/organizations/${params.id}/subadmins`,
-      tabIndex: 1 // Maps to the SUB-ADMINS tab
+      tabIndex: 1, // Maps to the SUB-ADMINS tab
+      permissionKey: 'org.subadmins' // Requires user management permissions
     },
     { 
       text: 'Locations', 
       icon: <LocationIcon />, 
       path: `/organizations/${params.id}/locations`,
-      tabIndex: 2 // Maps to the LOCATIONS tab
+      tabIndex: 2, // Maps to the LOCATIONS tab
+      permissionKey: 'org.locations' // Requires location management permissions
     },
     { 
       text: 'Vendors', 
       icon: <VendorIcon />, 
       path: `/organizations/${params.id}/vendors`,
-      tabIndex: 3 // Maps to the VENDORS tab
+      tabIndex: 3, // Maps to the VENDORS tab
+      permissionKey: 'org.vendors' // Requires vendor management permissions
     },
     { 
       text: 'Tickets', 
       icon: <TicketIcon />, 
       path: `/organizations/${params.id}/tickets`,
-      tabIndex: 4 // Maps to the TICKETS tab
+      tabIndex: 4, // Maps to the TICKETS tab
+      permissionKey: 'org.tickets' // Requires ticket permissions
+    },
+    { 
+      text: 'Issue Types', 
+      icon: <IssueTypeIcon />, 
+      path: `/organizations/${params.id}/issues`,
+      tabIndex: 5, // Maps to the ISSUE TYPES tab
+      permissionKey: 'org.issues' // Requires issue type management permissions
+    },
+    { 
+      text: 'Invoices', 
+      icon: <InvoiceIcon />, 
+      path: `/organizations/${params.id}/invoices`,
+      tabIndex: 6, // Maps to the INVOICES tab
+      permissionKey: 'org.invoices' // Requires invoice permissions
     }
   ];
 
@@ -142,22 +167,34 @@ const Layout = ({ children }) => {
       <Divider />
       <List>
         {/* Always visible root navigation */}
-        {rootNavItems.map((item) => (
-          <ListItem 
-            button 
-            key={item.text} 
-            onClick={() => handleNavigate(item.path)}
-            selected={location.pathname === item.path}
-            sx={{
-              '&.Mui-selected': {
-                backgroundColor: theme.palette.action.selected,
-              }
-            }}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
+        {rootNavItems.map((item) => {
+          // Check permissions for this menu item
+          const requiredPermissions = menuPermissionMap[item.path] || [];
+          
+          return (
+            <PermissionGuard
+              key={item.text}
+              permissions={requiredPermissions}
+              requireAll={false}
+              fallback={null}
+            >
+              <ListItem 
+                button 
+                key={item.text} 
+                onClick={() => handleNavigate(item.path)}
+                selected={location.pathname === item.path}
+                sx={{
+                  '&.Mui-selected': {
+                    backgroundColor: theme.palette.action.selected,
+                  }
+                }}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItem>
+            </PermissionGuard>
+          );
+        })}
         
         {/* Organization context menu - aligns with tabs */}
         {inOrgContext && (
@@ -169,22 +206,34 @@ const Layout = ({ children }) => {
               </Typography>
             </ListItem>
             
-            {orgContextNavItems.map((item) => (
-              <ListItem 
-                button 
-                key={item.text} 
-                onClick={() => handleNavigate(item.path, item.tabIndex)}
-                selected={location.pathname === item.path}
-                sx={{
-                  '&.Mui-selected': {
-                    backgroundColor: theme.palette.action.selected,
-                  }
-                }}
-              >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItem>
-            ))}
+            {orgContextNavItems.map((item) => {
+              // Get required permissions for this menu item
+              const requiredPermissions = menuPermissionMap[item.permissionKey] || [];
+              
+              return (
+                <PermissionGuard
+                  key={item.text}
+                  permissions={requiredPermissions}
+                  requireAll={false}
+                  fallback={null}
+                >
+                  <ListItem 
+                    button 
+                    key={item.text} 
+                    onClick={() => handleNavigate(item.path, item.tabIndex)}
+                    selected={location.pathname === item.path}
+                    sx={{
+                      '&.Mui-selected': {
+                        backgroundColor: theme.palette.action.selected,
+                      }
+                    }}
+                  >
+                    <ListItemIcon>{item.icon}</ListItemIcon>
+                    <ListItemText primary={item.text} />
+                  </ListItem>
+                </PermissionGuard>
+              );
+            })}
           </>
         )}
       </List>

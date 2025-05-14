@@ -47,7 +47,7 @@ const Vendors = () => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
-  const { getVendors, addVendor, getOrganizations, getOrganization } = useData();
+  const { getVendors, addVendor, updateVendor, getOrganizations, getOrganization } = useData();
   
   // Check if we're in organization context
   const orgId = params.id;
@@ -58,12 +58,13 @@ const Vendors = () => {
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editVendorId, setEditVendorId] = useState(null);
+  const [vendors, setVendors] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     password: '',
-    tier: 'standard',
     status: 'active',
     specialties: '',
     orgIds: isOrgContext ? [orgId] : []
@@ -72,8 +73,20 @@ const Vendors = () => {
   // Filter status state
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Get all organizations for the form
-  const organizations = getOrganizations();
+  // Fetch organizations when component mounts
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        const orgs = await getOrganizations();
+        setOrganizations(orgs || []);
+      } catch (error) {
+        console.error('Error fetching organizations:', error);
+        setOrganizations([]);
+      }
+    };
+    
+    fetchOrganizations();
+  }, [getOrganizations]);
   
   useEffect(() => {
     // Update form data when organization context changes
@@ -155,7 +168,7 @@ const Vendors = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       // Prevent adding new vendors in organization context
@@ -174,18 +187,16 @@ const Vendors = () => {
         vendorData = {
           ...formData,
           id: editVendorId,
-          // Only add timestamp to email if it's a new email
-          email: formData.email.includes('+') 
+          // Keep email as is if no new password
+          email: formData.password.trim() === ''
             ? formData.email 
             : `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
         };
       } else {
-        // New vendor - add timestamp to email
+        // New vendor, always use timestamped email
         vendorData = {
           ...formData,
-          email: formData.email.includes('+') 
-            ? formData.email 
-            : `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
+          email: `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
         };
       }
       
@@ -195,7 +206,34 @@ const Vendors = () => {
       }
       
       console.log('Saving vendor with data:', vendorData);
-      addVendor(vendorData);
+    
+    // Use updateVendor when editing, addVendor when creating new
+    if (editVendorId) {
+      await updateVendor(editVendorId, vendorData);
+    } else {
+      await addVendor(vendorData);
+    }
+      
+      // Refresh both vendors and organizations data after adding or updating
+      const [allVendors, orgs] = await Promise.all([
+        getVendors(),
+        getOrganizations()
+      ]);
+      
+      // Update organizations state
+      setOrganizations(orgs || []);
+      
+      // Filter vendors
+      const filteredByOrg = isOrgContext
+        ? allVendors.filter(vendor => vendor.orgIds && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId))
+        : allVendors;
+      
+      const filteredVendors = statusFilter === 'all'
+        ? filteredByOrg
+        : filteredByOrg.filter(vendor => (vendor.status || 'active') === statusFilter);
+        
+      setVendors(filteredVendors || []);
+      
       handleCloseDialog();
     } catch (error) {
       console.error('Failed to save vendor:', error);
@@ -203,19 +241,39 @@ const Vendors = () => {
     }
   };
 
-  // Get vendors based on context and filter
-  const allVendors = getVendors();
-  const filteredByOrg = isOrgContext 
-    ? allVendors.filter(vendor => vendor.orgIds && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId))
-    : allVendors;
-  
-  // Apply status filter
-  const vendors = statusFilter === 'all' 
-    ? filteredByOrg 
-    : filteredByOrg.filter(vendor => (vendor.status || 'active') === statusFilter);
+  // Fetch vendors data when component mounts or when dependencies change
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        // Get vendors from API
+        const allVendors = await getVendors();
+        
+        // Filter by organization if in org context
+        const filteredByOrg = isOrgContext
+          ? allVendors.filter(vendor => vendor.orgIds && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId))
+          : allVendors;
+        
+        // Apply status filter
+        const filteredVendors = statusFilter === 'all'
+          ? filteredByOrg
+          : filteredByOrg.filter(vendor => (vendor.status || 'active') === statusFilter);
+          
+        setVendors(filteredVendors || []);
+      } catch (error) {
+        console.error('Error fetching vendors:', error);
+        setVendors([]);
+      }
+    };
+    
+    fetchVendors();
+  }, [getVendors, isOrgContext, orgId, statusFilter]);
 
   // Helper to get organization names for a vendor
   const getOrgNamesForVendor = (orgIds) => {
+    if (!orgIds || !Array.isArray(orgIds) || !Array.isArray(organizations)) {
+      return ['Loading...'];
+    }
+    
     return orgIds.map(id => {
       const org = organizations.find(org => org.id === id);
       return org ? org.name : 'Unknown Organization';
@@ -291,9 +349,14 @@ const Vendors = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {(isOrgContext ? getVendors(orgId) : getVendors())
-              .filter(vendor => statusFilter === 'all' || vendor.status === statusFilter)
-              .map((vendor) => (
+            {vendors.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  No vendors found
+                </TableCell>
+              </TableRow>
+            ) : (
+              vendors.map((vendor) => (
                 <TableRow key={vendor.id}>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -342,15 +405,7 @@ const Vendors = () => {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
-            {(isOrgContext ? getVendors(orgId) : getVendors()).length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                    No vendors found. Add a vendor to get started.
-                  </Typography>
-                </TableCell>
-              </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -445,26 +500,7 @@ const Vendors = () => {
             )}
             
             {/* Always show vendor relationship fields */}
-            <Box sx={{ display: 'flex', gap: 2, mt: isOrgContext && editVendorId ? 0 : 2 }}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="tier-label">Vendor Tier</InputLabel>
-                <Select
-                  labelId="tier-label"
-                  id="tier"
-                  name="tier"
-                  value={formData.tier || 'standard'}
-                  label="Vendor Tier"
-                  onChange={handleChange}
-                >
-                  <MenuItem value="standard">Standard</MenuItem>
-                  <MenuItem value="preferred">Preferred</MenuItem>
-                  <MenuItem value="premium">Premium</MenuItem>
-                </Select>
-                <FormHelperText>
-                  Determines level of service and priority
-                </FormHelperText>
-              </FormControl>
-              
+            <Box sx={{ mt: isOrgContext && editVendorId ? 0 : 2 }}>
               <FormControl fullWidth margin="normal">
                 <InputLabel id="status-label">Status</InputLabel>
                 <Select
@@ -482,6 +518,25 @@ const Vendors = () => {
                   {formData.status === 'inactive' 
                     ? 'Inactive vendors will not receive new ticket assignments' 
                     : 'Active vendors can receive new ticket assignments'}
+                </FormHelperText>
+              </FormControl>
+              
+              <FormControl fullWidth margin="normal">
+                <InputLabel id="tier-label">Vendor Tier</InputLabel>
+                <Select
+                  labelId="tier-label"
+                  id="tier"
+                  name="tier"
+                  value={formData.tier || 1}
+                  label="Vendor Tier"
+                  onChange={handleChange}
+                >
+                  <MenuItem value={1}>Tier 1 (Standard)</MenuItem>
+                  <MenuItem value={2}>Tier 2 (Premium)</MenuItem>
+                  <MenuItem value={3}>Tier 3 (Enterprise)</MenuItem>
+                </Select>
+                <FormHelperText>
+                  Vendor tier determines service level and priority
                 </FormHelperText>
               </FormControl>
             </Box>
