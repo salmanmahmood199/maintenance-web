@@ -357,9 +357,28 @@ const Vendors = () => {
               </TableRow>
             ) : (
               vendors.map((vendor) => (
-                <TableRow key={vendor.id}>
+                <TableRow 
+                  key={vendor.id} 
+                  hover 
+                  sx={{ 
+                    cursor: 'pointer',
+                    '&:hover': { backgroundColor: 'action.hover' } 
+                  }}
+                  onClick={() => navigate(`/vendors/${vendor.id}`)}
+                >
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box 
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                          color: 'primary.main'
+                        }
+                      }}
+                      onClick={() => navigate(`/vendors/${vendor.id}`)}
+                    >
                       <VendorIcon color="primary" sx={{ mr: 1 }} />
                       {vendor.name}
                     </Box>
@@ -399,9 +418,23 @@ const Vendors = () => {
                   <TableCell align="right">
                     <Button 
                       size="small" 
-                      onClick={() => handleOpenDialog(vendor)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent row click from triggering
+                        handleOpenDialog(vendor);
+                      }}
                     >
                       Manage
+                    </Button>
+                    <Button 
+                      size="small" 
+                      color="primary"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent row click from triggering
+                        navigate(`/vendors/${vendor.id}`);
+                      }}
+                      sx={{ ml: 1 }}
+                    >
+                      View Details
                     </Button>
                   </TableCell>
                 </TableRow>

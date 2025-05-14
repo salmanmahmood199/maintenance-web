@@ -37,6 +37,7 @@ import {
   Add as AddIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 
 // Tab Panel component
 function TabPanel(props) {
@@ -69,7 +70,8 @@ const VendorDetail = () => {
     addTechnician,
     isEmailUnique,
     isPhoneUnique,
-    isPasswordStrong
+    isPasswordStrong,
+    getTickets
   } = useData();
 
   // State
@@ -106,6 +108,10 @@ const VendorDetail = () => {
   const technicians = getTechnicians(id);
   const organizations = getOrganizations();
   const vendorOrgs = organizations.filter(org => vendor.orgIds.includes(org.id));
+  
+  // Get tickets assigned to this vendor
+  const allTickets = getTickets();
+  const vendorTickets = allTickets.filter(ticket => ticket.assignedVendorId === id);
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -281,6 +287,7 @@ const VendorDetail = () => {
           scrollButtons="auto"
         >
           <Tab label="Technicians" />
+          <Tab label="Tickets" />
           <Tab label="Work Orders" disabled />
           <Tab label="Invoices" disabled />
         </Tabs>
@@ -345,15 +352,100 @@ const VendorDetail = () => {
           </TableContainer>
         </TabPanel>
 
-        {/* Work Orders Tab (Disabled for MVP) */}
+        {/* Tickets Tab */}
         <TabPanel value={tabValue} index={1}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Tickets Assigned to {vendor.name}</Typography>
+          </Box>
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Ticket ID</TableCell>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Organization</TableCell>
+                  <TableCell>Location</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Priority</TableCell>
+                  <TableCell>Created</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {vendorTickets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      No tickets are currently assigned to this vendor
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  vendorTickets.map((ticket) => {
+                    const org = organizations.find(o => o.id === ticket.orgId);
+                    const location = org?.locations?.find(l => l.id === ticket.locationId);
+                    
+                    return (
+                      <TableRow 
+                        key={ticket.id}
+                        hover
+                        sx={{ 
+                          cursor: 'pointer',
+                          '&:hover': { backgroundColor: 'action.hover' } 
+                        }}
+                        onClick={() => navigate(`/tickets/${ticket.id}`)}
+                      >
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <AssignmentIcon color="primary" sx={{ mr: 1 }} />
+                            {ticket.id.slice(0, 8)}
+                          </Box>
+                        </TableCell>
+                        <TableCell>{ticket.title}</TableCell>
+                        <TableCell>{org?.name || 'Unknown'}</TableCell>
+                        <TableCell>{location?.name || 'Unknown'}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={ticket.status} 
+                            color={
+                              ticket.status === 'completed' ? 'success' : 
+                              ticket.status === 'in_progress' ? 'primary' : 
+                              ticket.status === 'cancelled' ? 'error' : 
+                              'default'
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={ticket.priority} 
+                            color={
+                              ticket.priority === 'high' ? 'error' : 
+                              ticket.priority === 'medium' ? 'warning' : 
+                              'info'
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {new Date(ticket.createdAt).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
+        {/* Work Orders Tab (Disabled for MVP) */}
+        <TabPanel value={tabValue} index={2}>
           <Typography variant="body1">
             Work Orders functionality will be available in a future update.
           </Typography>
         </TabPanel>
 
         {/* Invoices Tab (Disabled for MVP) */}
-        <TabPanel value={tabValue} index={2}>
+        <TabPanel value={tabValue} index={3}>
           <Typography variant="body1">
             Invoices functionality will be available in a future update.
           </Typography>
