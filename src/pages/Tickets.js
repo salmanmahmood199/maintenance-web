@@ -108,8 +108,101 @@ const Tickets = () => {
   const [actionNote, setActionNote] = useState('');
   const [selectedVendor, setSelectedVendor] = useState('');
   
+  // Generate a temporary ticket number for preview
+  const generateTempTicketNo = () => {
+    return `TICK-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  };
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    ticketNo: '',
+    locationId: '',
+    issueType: '',
+    status: '',
+    dateFrom: '',
+    dateTo: '',
+    priority: ''
+  });
+  const [showFilters, setShowFilters] = useState(false);
+  const [filteredTickets, setFilteredTickets] = useState([]);
+  
+  // Apply filters to tickets
+  const applyFilters = useCallback(() => {
+    let filtered = [...tickets];
+    
+    // Filter by ticket number
+    if (filters.ticketNo) {
+      filtered = filtered.filter(ticket => 
+        ticket.ticketNo.toLowerCase().includes(filters.ticketNo.toLowerCase())
+      );
+    }
+    
+    // Filter by location
+    if (filters.locationId) {
+      filtered = filtered.filter(ticket => ticket.locationId === filters.locationId);
+    }
+    
+    // Filter by issue type
+    if (filters.issueType) {
+      filtered = filtered.filter(ticket => ticket.issueType === filters.issueType);
+    }
+    
+    // Filter by status
+    if (filters.status) {
+      filtered = filtered.filter(ticket => ticket.status === filters.status);
+    }
+    
+    // Filter by priority
+    if (filters.priority) {
+      filtered = filtered.filter(ticket => ticket.priority === filters.priority);
+    }
+    
+    // Filter by date range
+    if (filters.dateFrom) {
+      const fromDate = new Date(filters.dateFrom);
+      filtered = filtered.filter(ticket => new Date(ticket.dateTime) >= fromDate);
+    }
+    
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo);
+      // Set time to end of day
+      toDate.setHours(23, 59, 59);
+      filtered = filtered.filter(ticket => new Date(ticket.dateTime) <= toDate);
+    }
+    
+    setFilteredTickets(filtered);
+  }, [tickets, filters]);
+  
+  // Handle filter changes
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      ticketNo: '',
+      locationId: '',
+      issueType: '',
+      status: '',
+      dateFrom: '',
+      dateTo: '',
+      priority: ''
+    });
+  };
+  
+  // Toggle filter panel
+  const toggleFilters = () => {
+    setShowFilters(prev => !prev);
+  };
+  
   // Form data
   const [formData, setFormData] = useState({
+    ticketNo: generateTempTicketNo(), // Auto-generated ticket number
     locationId: '',
     issueType: '',
     description: '',
@@ -133,39 +226,47 @@ const Tickets = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Get accessible locations based on user role
-        let accessibleLocations = [];
-        let filteredTickets = [];
-        
-        // If user is a sub-admin, filter by assigned locations
-        if (currentUser && currentUser.role === 'subadmin') {
-          console.log('Filtering tickets for sub-admin:', currentUser.id);
-          accessibleLocations = await getAccessibleLocations(currentUser.id);
-          
-          // Get all tickets
-          const allTickets = await getTickets();
-          
-          // Filter tickets to only include those for accessible locations
-          filteredTickets = allTickets.filter(ticket => {
-            const locationId = ticket.locationId;
-            return accessibleLocations.some(loc => loc.id === locationId);
-          });
+        // Get available locations based on user role
+        let availableLocations = [];
+        if (currentUser?.role === 'subadmin') {
+          availableLocations = await getAccessibleLocations(currentUser.id);
         } else {
-          // Admin/root users can see all tickets
-          filteredTickets = await getTickets();
-          accessibleLocations = await getLocations();
+          availableLocations = await getLocations();
         }
+        setLocations(availableLocations);
         
         // Get vendors
-        const vendorsData = await getVendors();
+        const vendorsList = await getVendors();
+        setVendors(vendorsList);
         
-        // Update state with fetched data
-        setTickets(filteredTickets || []);
-        setLocations(accessibleLocations || []);
-        setVendors(vendorsData || []);
+        // Get tickets based on available locations
+        if (availableLocations.length > 0) {
+          // For super admin, get all tickets
+          // For sub-admin, only get tickets related to their assigned locations
+          let ticketsList = [];
+          if (currentUser?.role === 'root') {
+            ticketsList = await getTickets();
+          } else {
+            // Get tickets for each location the user has access to
+            const locationIds = availableLocations.map(loc => loc.id);
+            const allTickets = await getTickets();
+            ticketsList = allTickets.filter(ticket => locationIds.includes(ticket.locationId));
+          }
+          setTickets(ticketsList);
+          setFilteredTickets(ticketsList); // Initialize filtered tickets with all tickets
+        } else {
+          setTickets([]);
+          setFilteredTickets([]);
+          setLocations([]);
+          setVendors([]);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
+        alert(`Error: ${error.message}`);
+        
+        // Clear data in case of error
         setTickets([]);
+        setFilteredTickets([]);
         setLocations([]);
         setVendors([]);
       }
@@ -173,6 +274,11 @@ const Tickets = () => {
     
     fetchData();
   }, [getTickets, getLocations, getVendors, getAccessibleLocations, currentUser]);
+  
+  // Apply filters when filters change or tickets change
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters, tickets]);
 
   // Handle input change
   const handleChange = (e) => {
@@ -228,8 +334,9 @@ const Tickets = () => {
     setSelectedFiles([]);
     setFilePreviewUrls([]);
     
-    // Reset form data
+    // Reset form data with a new ticket number
     setFormData({
+      ticketNo: generateTempTicketNo(), // Generate a new ticket number
       locationId: '',
       issueType: '',
       description: '',
@@ -490,14 +597,157 @@ const Tickets = () => {
         <Typography variant="h4" component="h1">
           Tickets
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
-        >
-          Create Ticket
-        </Button>
+        <Box>
+          <Button
+            variant="outlined"
+            sx={{ mr: 1 }}
+            onClick={toggleFilters}
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleOpenDialog}
+          >
+            Create Ticket
+          </Button>
+        </Box>
       </Box>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Filter Tickets
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                label="Ticket Number"
+                name="ticketNo"
+                value={filters.ticketNo}
+                onChange={handleFilterChange}
+                size="small"
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth margin="normal" size="small">
+                <InputLabel id="location-filter-label">Location</InputLabel>
+                <Select
+                  labelId="location-filter-label"
+                  name="locationId"
+                  value={filters.locationId}
+                  label="Location"
+                  onChange={handleFilterChange}
+                >
+                  <MenuItem value="">All Locations</MenuItem>
+                  {locations.map((location) => (
+                    <MenuItem key={location.id} value={location.id}>
+                      {location.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth margin="normal" size="small">
+                <InputLabel id="issue-filter-label">Issue Type</InputLabel>
+                <Select
+                  labelId="issue-filter-label"
+                  name="issueType"
+                  value={filters.issueType}
+                  label="Issue Type"
+                  onChange={handleFilterChange}
+                >
+                  <MenuItem value="">All Issues</MenuItem>
+                  {ISSUE_TYPES.map((type) => (
+                    <MenuItem key={type.value} value={type.value}>
+                      {type.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth margin="normal" size="small">
+                <InputLabel id="status-filter-label">Status</InputLabel>
+                <Select
+                  labelId="status-filter-label"
+                  name="status"
+                  value={filters.status}
+                  label="Status"
+                  onChange={handleFilterChange}
+                >
+                  <MenuItem value="">All Statuses</MenuItem>
+                  <MenuItem value="New">New</MenuItem>
+                  <MenuItem value="Assigned">Assigned</MenuItem>
+                  <MenuItem value="In Progress">In Progress</MenuItem>
+                  <MenuItem value="Paused">Paused</MenuItem>
+                  <MenuItem value="Completed">Completed</MenuItem>
+                  <MenuItem value="Verified">Verified</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth margin="normal" size="small">
+                <InputLabel id="priority-filter-label">Priority</InputLabel>
+                <Select
+                  labelId="priority-filter-label"
+                  name="priority"
+                  value={filters.priority}
+                  label="Priority"
+                  onChange={handleFilterChange}
+                >
+                  <MenuItem value="">All Priorities</MenuItem>
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                  <MenuItem value="critical">Critical</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                label="From Date"
+                name="dateFrom"
+                type="date"
+                value={filters.dateFrom}
+                onChange={handleFilterChange}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                fullWidth
+                label="To Date"
+                name="dateTo"
+                type="date"
+                value={filters.dateTo}
+                onChange={handleFilterChange}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', alignItems: 'center' }}>
+              <Button 
+                variant="outlined" 
+                onClick={clearFilters}
+                sx={{ mt: 2 }}
+                fullWidth
+              >
+                Clear Filters
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      )}
 
       {/* Tickets Table */}
       <TableContainer component={Paper}>
@@ -514,14 +764,14 @@ const Tickets = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {tickets.length === 0 ? (
+            {filteredTickets.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} align="center">
-                  No tickets found
+                  {tickets.length > 0 ? 'No tickets match the current filters' : 'No tickets found'}
                 </TableCell>
               </TableRow>
             ) : (
-              tickets.map((ticket) => (
+              filteredTickets.map((ticket) => (
                 <TableRow key={ticket.id}>
                   <TableCell>{ticket.ticketNo}</TableCell>
                   <TableCell>{formatDate(ticket.dateTime)}</TableCell>
@@ -558,6 +808,21 @@ const Tickets = () => {
         <DialogTitle>Create Ticket</DialogTitle>
         <DialogContent>
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+            {/* Ticket Number - grayed out and auto-filled */}
+            <TextField
+              margin="normal"
+              fullWidth
+              id="ticketNo"
+              label="Ticket #"
+              name="ticketNo"
+              value={formData.ticketNo}
+              InputProps={{
+                readOnly: true,
+              }}
+              disabled
+              sx={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', mb: 2 }}
+            />
+            
             {/* Timestamp field - grayed out and auto-filled */}
             <TextField
               margin="normal"
