@@ -62,7 +62,7 @@ const STATUS_COLORS = {
 };
 
 const Tickets = () => {
-  const { user } = useAuth();
+  const { user, currentUser } = useAuth();
   const { 
     getTickets, 
     addTicket,
@@ -73,7 +73,9 @@ const Tickets = () => {
     startWork,
     pauseWork,
     completeWork,
-    verifyCompletion
+    verifyCompletion,
+    hasLocationAccess,
+    getAccessibleLocations
   } = useData();
 
   // States
@@ -103,16 +105,35 @@ const Tickets = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch all data in parallel
-        const [ticketsData, locationsData, vendorsData] = await Promise.all([
-          getTickets(),
-          getLocations(),
-          getVendors()
-        ]);
+        // Get accessible locations based on user role
+        let accessibleLocations = [];
+        let filteredTickets = [];
+        
+        // If user is a sub-admin, filter by assigned locations
+        if (currentUser && currentUser.role === 'subadmin') {
+          console.log('Filtering tickets for sub-admin:', currentUser.id);
+          accessibleLocations = await getAccessibleLocations(currentUser.id);
+          
+          // Get all tickets
+          const allTickets = await getTickets();
+          
+          // Filter tickets to only include those for accessible locations
+          filteredTickets = allTickets.filter(ticket => {
+            const locationId = ticket.locationId;
+            return accessibleLocations.some(loc => loc.id === locationId);
+          });
+        } else {
+          // Admin/root users can see all tickets
+          filteredTickets = await getTickets();
+          accessibleLocations = await getLocations();
+        }
+        
+        // Get vendors
+        const vendorsData = await getVendors();
         
         // Update state with fetched data
-        setTickets(ticketsData || []);
-        setLocations(locationsData || []);
+        setTickets(filteredTickets || []);
+        setLocations(accessibleLocations || []);
         setVendors(vendorsData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -123,7 +144,7 @@ const Tickets = () => {
     };
     
     fetchData();
-  }, [getTickets, getLocations, getVendors]);
+  }, [getTickets, getLocations, getVendors, getAccessibleLocations, currentUser]);
 
   // Handle input change
   const handleChange = (e) => {
@@ -426,7 +447,7 @@ const Tickets = () => {
                 ) : (
                   locations.map((location) => (
                     <MenuItem key={location.id} value={location.id}>
-                      {location.name}
+                      {location.name} - {location.address}, {location.city || ''}
                     </MenuItem>
                   ))
                 )}

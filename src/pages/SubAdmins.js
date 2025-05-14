@@ -38,7 +38,8 @@ import {
   ArrowBack as ArrowBackIcon,
   Lock as LockIcon,
   VpnKey as KeyIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  LocationOn as LocationIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -50,6 +51,7 @@ const SubAdmins = () => {
     updateSubAdmin,
     getOrganizations, 
     getOrganization,
+    getLocations,
     data
   } = useData();
   const params = useParams();
@@ -65,7 +67,10 @@ const SubAdmins = () => {
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [resetPasswordDialog, setResetPasswordDialog] = useState(false);
+  const [locationAssignDialog, setLocationAssignDialog] = useState(false);
   const [selectedSubAdmin, setSelectedSubAdmin] = useState(null);
+  const [locations, setLocations] = useState([]);
+  const [selectedLocations, setSelectedLocations] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
     id: null,
@@ -116,7 +121,24 @@ const SubAdmins = () => {
         organizationId: orgId
       }));
     }
-  }, [orgId, isOrgContext]);
+    
+    // Fetch locations for this organization
+    const fetchLocations = async () => {
+      try {
+        const allLocations = await getLocations();
+        if (isOrgContext) {
+          setLocations(allLocations.filter(loc => loc.orgId === orgId) || []);
+        } else {
+          setLocations(allLocations || []);
+        }
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        setLocations([]);
+      }
+    };
+    
+    fetchLocations();
+  }, [orgId, isOrgContext, getLocations]);
 
   // Define available roles with detailed descriptions
   const availableRoles = [
@@ -252,6 +274,61 @@ const SubAdmins = () => {
       confirmPassword: ''
     });
     setResetPasswordDialog(true);
+  };
+  
+  // Handle location assignment dialog open
+  const handleOpenLocationAssign = (subAdmin) => {
+    setSelectedSubAdmin(subAdmin);
+    
+    // Set initially selected locations based on subAdmin's current assignments
+    if (subAdmin.assignedLocationIds && Array.isArray(subAdmin.assignedLocationIds)) {
+      setSelectedLocations(subAdmin.assignedLocationIds);
+    } else {
+      setSelectedLocations([]);
+    }
+    
+    setLocationAssignDialog(true);
+  };
+  
+  // Handle location assignment dialog close
+  const handleCloseLocationAssign = () => {
+    setLocationAssignDialog(false);
+    setSelectedLocations([]);
+  };
+  
+  // Handle location checkbox change
+  const handleLocationChange = (locationId) => {
+    setSelectedLocations(prev => {
+      if (prev.includes(locationId)) {
+        return prev.filter(id => id !== locationId);
+      } else {
+        return [...prev, locationId];
+      }
+    });
+  };
+  
+  // Save location assignments
+  const handleSaveLocationAssignments = async () => {
+    if (!selectedSubAdmin) return;
+    
+    try {
+      // Create updated subAdmin object with new location assignments
+      const updatedSubAdmin = {
+        ...selectedSubAdmin,
+        assignedLocationIds: selectedLocations
+      };
+      
+      await updateSubAdmin(selectedSubAdmin.id, updatedSubAdmin);
+      
+      // Refresh subAdmins data after updating
+      const admins = await getSubAdmins();
+      setSubAdmins(admins || []);
+      
+      handleCloseLocationAssign();
+    } catch (error) {
+      console.error('Error updating sub-admin locations:', error);
+      alert(`Error updating location assignments: ${error.message}`);
+    }
   };
   
   const handleCloseResetPassword = () => {
@@ -478,6 +555,7 @@ const SubAdmins = () => {
               <TableCell>Phone</TableCell>
               {!isOrgContext && <TableCell>Organization</TableCell>}
               <TableCell>Role/Permissions</TableCell>
+              <TableCell>Assigned Locations</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -545,7 +623,41 @@ const SubAdmins = () => {
                       )}
                     </Box>
                   </TableCell>
+                  <TableCell>
+                    {admin.assignedLocationIds && admin.assignedLocationIds.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {admin.assignedLocationIds.slice(0, 2).map(locId => {
+                          const location = locations.find(loc => loc.id === locId);
+                          return (
+                            <Chip 
+                              key={locId} 
+                              label={location ? location.name : 'Unknown'} 
+                              size="small" 
+                              variant="outlined"
+                              color="secondary"
+                            />
+                          );
+                        })}
+                        {(admin.assignedLocationIds.length > 2) && (
+                          <Chip 
+                            label={`+${admin.assignedLocationIds.length - 2} more`} 
+                            size="small"
+                            color="secondary"
+                          />
+                        )}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No assigned locations
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell align="right">
+                    <Tooltip title="Assign Locations">
+                      <IconButton onClick={() => handleOpenLocationAssign(admin)}>
+                        <LocationIcon fontSize="small" color="primary" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Reset Password">
                       <IconButton onClick={() => handleOpenResetPassword(admin)}>
                         <KeyIcon fontSize="small" />
@@ -709,6 +821,67 @@ const SubAdmins = () => {
             disabled={!isOrgContext && organizations.length === 0}
           >
             {editMode ? 'Save Changes' : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Location Assignment Dialog */}
+      <Dialog open={locationAssignDialog} onClose={handleCloseLocationAssign} maxWidth="sm" fullWidth>
+        <DialogTitle>Assign Locations</DialogTitle>
+        <DialogContent>
+          {selectedSubAdmin && (
+            <>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Assigning locations to {selectedSubAdmin.name || selectedSubAdmin.email}. 
+                This sub-admin will only be able to view and manage tickets for their assigned locations.
+              </Alert>
+              
+              {locations.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ my: 2 }}>
+                  No locations available. Please add locations first.
+                </Typography>
+              ) : (
+                <>
+                  <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                    Select Locations:
+                  </Typography>
+                  <Box sx={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #eee', borderRadius: 1, p: 1 }}>
+                    <FormGroup>
+                      {locations.map((loc) => (
+                        <FormControlLabel
+                          key={loc.id}
+                          control={
+                            <Checkbox
+                              checked={selectedLocations.includes(loc.id)}
+                              onChange={() => handleLocationChange(loc.id)}
+                            />
+                          }
+                          label={
+                            <Box>
+                              <Typography variant="body2">{loc.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {loc.address}, {loc.city}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      ))}
+                    </FormGroup>
+                  </Box>
+                </>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseLocationAssign}>Cancel</Button>
+          <Button 
+            onClick={handleSaveLocationAssignments} 
+            variant="contained"
+            color="primary"
+            disabled={locations.length === 0}
+          >
+            Save Location Assignments
           </Button>
         </DialogActions>
       </Dialog>

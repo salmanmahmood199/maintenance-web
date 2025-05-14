@@ -415,7 +415,8 @@ export const DataProvider = ({ children }) => {
       password,
       role: 'subadmin',
       organizationId,
-      permissions
+      permissions,
+      assignedLocationIds: [] // Array of assigned location IDs
     };
 
     // Add user record
@@ -763,6 +764,45 @@ export const DataProvider = ({ children }) => {
       ? getItems('technicians', tech => tech.vendorId === vendorId)
       : getItems('technicians');
 
+  // Sub-admin location access check
+  const hasLocationAccess = (subAdminId, locationId) => {
+    if (!subAdminId || !locationId) return false;
+    
+    // Get the sub-admin record
+    const subAdmin = getItem('subAdmins', subAdminId);
+    if (!subAdmin) return false;
+    
+    // If no assigned locations, they might be a super-admin with access to all locations
+    if (!subAdmin.assignedLocationIds || !Array.isArray(subAdmin.assignedLocationIds) || subAdmin.assignedLocationIds.length === 0) {
+      // Check if they have the assignLocation permission (indicating they're an admin with full access)
+      return subAdmin.permissions?.includes('subadmin.assignLocation') || false;
+    }
+    
+    // Otherwise, check if the location is in their assigned locations
+    return subAdmin.assignedLocationIds.includes(locationId);
+  };
+  
+  // Get all locations a sub-admin has access to
+  const getAccessibleLocations = (subAdminId) => {
+    if (!subAdminId) return [];
+    
+    const subAdmin = getItem('subAdmins', subAdminId);
+    if (!subAdmin) return [];
+    
+    // If they have assignLocation permission or no assigned locations, they can see all locations in their org
+    if (subAdmin.permissions?.includes('subadmin.assignLocation') || 
+        !subAdmin.assignedLocationIds || 
+        !Array.isArray(subAdmin.assignedLocationIds) || 
+        subAdmin.assignedLocationIds.length === 0) {
+      
+      const orgId = subAdmin.organizationId;
+      return getItems('locations', loc => loc.orgId === orgId);
+    }
+    
+    // Otherwise, filter locations based on their assigned location IDs
+    return getItems('locations', loc => subAdmin.assignedLocationIds.includes(loc.id));
+  };
+
   // Context value with all operations
   const value = {
     data,
@@ -830,7 +870,11 @@ export const DataProvider = ({ children }) => {
     startWork,
     pauseWork,
     completeWork,
-    verifyCompletion
+    verifyCompletion,
+    
+    // Location Access Control
+    hasLocationAccess,
+    getAccessibleLocations
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

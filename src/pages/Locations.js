@@ -35,10 +35,12 @@ import {
   Business as BusinessIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 const Locations = () => {
-  const { getLocations, addLocation, getOrganizations, getOrganization } = useData();
+  const { getLocations, addLocation, getOrganizations, getOrganization, getAccessibleLocations } = useData();
+  const { currentUser } = useAuth();
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,8 +77,24 @@ const Locations = () => {
         const orgs = await getOrganizations();
         setOrganizations(orgs || []);
         
-        // Fetch locations
-        const locs = await getLocations();
+        // Fetch locations based on user role
+        let locs = [];
+        
+        // If user is a sub-admin, filter locations based on assignments
+        if (currentUser && currentUser.role === 'subadmin') {
+          console.log('Filtering locations for sub-admin:', currentUser.id);
+          // Use the getAccessibleLocations helper to get only assigned locations
+          locs = await getAccessibleLocations(currentUser.id);
+        } else {
+          // Admin/root users can see all locations
+          locs = await getLocations();
+        }
+        
+        // Further filter by organization context if needed
+        if (isOrgContext) {
+          locs = locs.filter(loc => loc.orgId === orgId);
+        }
+        
         setLocations(locs || []);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -86,7 +104,7 @@ const Locations = () => {
     };
     
     fetchData();
-  }, [getOrganizations, getLocations]);
+  }, [getOrganizations, getLocations, getAccessibleLocations, currentUser, isOrgContext, orgId]);
   
   useEffect(() => {
     // Update form data when organization context changes
