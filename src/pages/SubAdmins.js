@@ -71,6 +71,7 @@ const SubAdmins = () => {
   const [selectedSubAdmin, setSelectedSubAdmin] = useState(null);
   const [locations, setLocations] = useState([]);
   const [selectedLocations, setSelectedLocations] = useState([]);
+  const [locationTierPermissions, setLocationTierPermissions] = useState({});
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
     id: null,
@@ -150,17 +151,7 @@ const SubAdmins = () => {
     { 
       id: 'subadmin.acceptTicket', 
       label: 'Accept Ticket',
-      description: 'Lets a user claim any "New" ticket at Tier 1 and assign it to a vendor.'
-    },
-    { 
-      id: 'subadmin.tier2AcceptTicket', 
-      label: 'Tier 2 Accept Ticket',
-      description: 'Lets a user handle tickets that weren\'t claimed at Tier 1—i.e., pick up or reassign jobs in the Tier 2 queue.'
-    },
-    { 
-      id: 'subadmin.tier3AcceptTicket', 
-      label: 'Tier 3 Accept Ticket',
-      description: 'Lets a user handle tickets that weren\'t claimed at Tier 2—i.e., pick up or reassign jobs in the Tier 3 queue.'
+      description: 'Lets a user claim any "New" ticket and assign it to a vendor.'
     },
     { 
       id: 'subadmin.addVendor', 
@@ -287,6 +278,15 @@ const SubAdmins = () => {
       setSelectedLocations([]);
     }
     
+    // Initialize tier permissions if the admin has them saved
+    const initialTierPermissions = {};
+    if (subAdmin.locationTierPermissions) {
+      Object.keys(subAdmin.locationTierPermissions).forEach(locId => {
+        initialTierPermissions[locId] = subAdmin.locationTierPermissions[locId];
+      });
+    }
+    setLocationTierPermissions(initialTierPermissions);
+    
     setLocationAssignDialog(true);
   };
   
@@ -294,16 +294,62 @@ const SubAdmins = () => {
   const handleCloseLocationAssign = () => {
     setLocationAssignDialog(false);
     setSelectedLocations([]);
+    setLocationTierPermissions({});
   };
   
   // Handle location checkbox change
   const handleLocationChange = (locationId) => {
     setSelectedLocations(prev => {
       if (prev.includes(locationId)) {
+        // Remove location and its tier permissions
+        const newLocationTierPermissions = {...locationTierPermissions};
+        delete newLocationTierPermissions[locationId];
+        setLocationTierPermissions(newLocationTierPermissions);
         return prev.filter(id => id !== locationId);
       } else {
         return [...prev, locationId];
       }
+    });
+  };
+  
+  // Handle tier permission change for a location
+  const handleTierPermissionChange = (locationId, tier, checked) => {
+    setLocationTierPermissions(prev => {
+      const locationPermissions = prev[locationId] || { acceptTicket: false, tiers: [] };
+      
+      let updatedTiers;
+      if (checked) {
+        // Add tier if not already included
+        updatedTiers = [...locationPermissions.tiers, tier].filter((v, i, a) => a.indexOf(v) === i);
+      } else {
+        // Remove tier
+        updatedTiers = locationPermissions.tiers.filter(t => t !== tier);
+      }
+      
+      return {
+        ...prev,
+        [locationId]: {
+          ...locationPermissions,
+          tiers: updatedTiers
+        }
+      };
+    });
+  };
+  
+  // Toggle accept ticket permission for a location
+  const toggleAcceptTicketForLocation = (locationId, checked) => {
+    setLocationTierPermissions(prev => {
+      const locationPermissions = prev[locationId] || { acceptTicket: false, tiers: [] };
+      
+      return {
+        ...prev,
+        [locationId]: {
+          ...locationPermissions,
+          acceptTicket: checked,
+          // If unchecking accept ticket, clear tiers
+          tiers: checked ? locationPermissions.tiers : []
+        }
+      };
     });
   };
   
@@ -312,10 +358,11 @@ const SubAdmins = () => {
     if (!selectedSubAdmin) return;
     
     try {
-      // Create updated subAdmin object with new location assignments
+      // Create updated subAdmin object with new location assignments and tier permissions
       const updatedSubAdmin = {
         ...selectedSubAdmin,
-        assignedLocationIds: selectedLocations
+        assignedLocationIds: selectedLocations,
+        locationTierPermissions: locationTierPermissions
       };
       
       await updateSubAdmin(selectedSubAdmin.id, updatedSubAdmin);
@@ -847,25 +894,92 @@ const SubAdmins = () => {
                   </Typography>
                   <Box sx={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #eee', borderRadius: 1, p: 1 }}>
                     <FormGroup>
-                      {locations.map((loc) => (
-                        <FormControlLabel
-                          key={loc.id}
-                          control={
-                            <Checkbox
-                              checked={selectedLocations.includes(loc.id)}
-                              onChange={() => handleLocationChange(loc.id)}
+                      {locations.map((loc) => {
+                        // Check if the subadmin has accept ticket permission
+                        const hasAcceptTicketPermission = selectedSubAdmin?.permissions?.includes('subadmin.acceptTicket');
+                        const isLocationSelected = selectedLocations.includes(loc.id);
+                        const locationPermissions = locationTierPermissions[loc.id] || { acceptTicket: false, tiers: [] };
+                        
+                        return (
+                          <Box key={loc.id} sx={{ mb: 2, borderBottom: isLocationSelected ? '1px dashed #eee' : 'none', pb: isLocationSelected ? 2 : 0 }}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={isLocationSelected}
+                                  onChange={() => handleLocationChange(loc.id)}
+                                />
+                              }
+                              label={
+                                <Box>
+                                  <Typography variant="body2">{loc.name}</Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {loc.address}, {loc.city || ''}
+                                  </Typography>
+                                </Box>
+                              }
                             />
-                          }
-                          label={
-                            <Box>
-                              <Typography variant="body2">{loc.name}</Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {loc.address}, {loc.city}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                      ))}
+                            
+                            {/* Show ticket acceptance options only if the location is selected AND the admin has the accept ticket permission */}
+                            {isLocationSelected && hasAcceptTicketPermission && (
+                              <Box sx={{ ml: 4, mt: 1 }}>
+                                <FormControlLabel
+                                  control={
+                                    <Checkbox
+                                      checked={locationPermissions.acceptTicket || false}
+                                      onChange={(e) => toggleAcceptTicketForLocation(loc.id, e.target.checked)}
+                                      size="small"
+                                    />
+                                  }
+                                  label={
+                                    <Typography variant="body2">
+                                      Can accept tickets for this location?
+                                    </Typography>
+                                  }
+                                />
+                                
+                                {/* Show tier options if "can accept tickets" is checked */}
+                                {locationPermissions.acceptTicket && (
+                                  <Box sx={{ ml: 4, mt: 0.5 }}>
+                                    <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                                      Select tiers this admin can manage:
+                                    </Typography>
+                                    <FormControlLabel
+                                      control={
+                                        <Checkbox
+                                          checked={locationPermissions.tiers?.includes(1) || false}
+                                          onChange={(e) => handleTierPermissionChange(loc.id, 1, e.target.checked)}
+                                          size="small"
+                                        />
+                                      }
+                                      label={<Typography variant="body2">Tier 1</Typography>}
+                                    />
+                                    <FormControlLabel
+                                      control={
+                                        <Checkbox
+                                          checked={locationPermissions.tiers?.includes(2) || false}
+                                          onChange={(e) => handleTierPermissionChange(loc.id, 2, e.target.checked)}
+                                          size="small"
+                                        />
+                                      }
+                                      label={<Typography variant="body2">Tier 2</Typography>}
+                                    />
+                                    <FormControlLabel
+                                      control={
+                                        <Checkbox
+                                          checked={locationPermissions.tiers?.includes(3) || false}
+                                          onChange={(e) => handleTierPermissionChange(loc.id, 3, e.target.checked)}
+                                          size="small"
+                                        />
+                                      }
+                                      label={<Typography variant="body2">Tier 3</Typography>}
+                                    />
+                                  </Box>
+                                )}
+                              </Box>
+                            )}
+                          </Box>
+                        );
+                      })}
                     </FormGroup>
                   </Box>
                 </>
