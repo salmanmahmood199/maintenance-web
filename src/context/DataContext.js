@@ -4,6 +4,19 @@ import { v4 as uuidv4 } from 'uuid';
 // Create context
 const DataContext = createContext();
 
+// System configuration
+const systemConfig = {
+  // Time in milliseconds before a ticket escalates from Tier 1A to Tier 1B (24 hours)
+  tier1AToTier1BEscalationTime: 24 * 60 * 60 * 1000,
+  
+  // Business hours for notifications (7am-7pm EST)
+  businessHoursStart: 7, // 7am EST
+  businessHoursEnd: 19,   // 7pm EST
+  
+  // Notification interval in hours
+  notificationInterval: 2
+};
+
 // Initial data for all entities
 const initialData = {
   organizations: [],
@@ -895,7 +908,7 @@ export const DataProvider = ({ children }) => {
   };
   
   // Check if a sub-admin can handle tickets of a specific tier for a location
-  const hasTicketTierAccess = (subAdminId, locationId, tier) => {
+  const hasTicketTierAccess = (subAdminId, locationId, tier, ticket = null) => {
     if (!subAdminId || !locationId) return false;
     
     // Get the sub-admin record
@@ -919,9 +932,36 @@ export const DataProvider = ({ children }) => {
       if (tier === 1) {
         // For Tier 1, check if they have either 1A or 1B access
         return locationPermissions.tiers?.includes('1A') || locationPermissions.tiers?.includes('1B');
-      } else if (tier === '1A' || tier === '1B') {
-        // Direct check for specific tier
-        return locationPermissions.tiers?.includes(tier);
+      } else if (tier === '1A') {
+        // Direct check for Tier 1A access
+        return locationPermissions.tiers?.includes('1A');
+      } else if (tier === '1B') {
+        // For Tier 1B, either they have direct 1B access OR
+        // it's a ticket that's been pending for over 24 hours and they have 1B access
+        const has1BAccess = locationPermissions.tiers?.includes('1B');
+        
+        if (has1BAccess && ticket) {
+          // Always allow if they have 1B access
+          return true;
+        } else if (!has1BAccess && ticket) {
+          // If they don't have 1B access directly, check if:  
+          // 1. The ticket has been pending for over 24 hours
+          // 2. They have 1A access
+          // 3. The ticket is still in 'New' status
+          
+          if (ticket.status !== 'New') return false;
+          
+          // Check if ticket creation time was over 24 hours ago
+          const ticketTime = new Date(ticket.createdAt).getTime();
+          const currentTime = new Date().getTime();
+          const elapsedTime = currentTime - ticketTime;
+          
+          // If it's been more than the configured escalation time, allow 1B access
+          if (elapsedTime >= systemConfig.tier1AToTier1BEscalationTime && locationPermissions.tiers?.includes('1A')) {
+            return true;
+          }
+        }
+        return has1BAccess;
       } else {
         // For Tier 2 and 3, check numeric values
         return locationPermissions.tiers?.includes(tier);
@@ -961,6 +1001,18 @@ export const DataProvider = ({ children }) => {
     return getItems('locations', loc => subAdmin.assignedLocationIds.includes(loc.id));
   };
 
+  // Check if a ticket should be escalated from Tier 1A to Tier 1B
+  const shouldEscalateToTier1B = (ticket) => {
+    if (!ticket || ticket.status !== 'New') return false;
+    
+    // Check if the ticket was created more than 24 hours ago
+    const ticketTime = new Date(ticket.createdAt).getTime();
+    const currentTime = new Date().getTime();
+    const elapsedTime = currentTime - ticketTime;
+    
+    return elapsedTime >= systemConfig.tier1AToTier1BEscalationTime;
+  };
+  
   // Context value with all operations
   const value = {
     data,
@@ -1037,7 +1089,11 @@ export const DataProvider = ({ children }) => {
     // Location Access Control
     hasLocationAccess,
     hasTicketTierAccess,
-    getAccessibleLocations
+    getAccessibleLocations,
+    
+    // Ticket Escalation
+    shouldEscalateToTier1B,
+    systemConfig
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

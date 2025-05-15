@@ -98,6 +98,8 @@ const Tickets = () => {
     verifyCompletion,
     hasLocationAccess,
     hasTicketTierAccess,
+    shouldEscalateToTier1B,
+    systemConfig,
     getAccessibleLocations
   } = useData();
 
@@ -153,12 +155,16 @@ const Tickets = () => {
         let tierToCheck = ticketTier;
         
         // For Tier 1 tickets, use the priority designation if available
-        if (ticketTier === 1 && ticket.priority) {
-          // High priority tickets are considered 1A, others 1B
-          tierToCheck = ticket.priority === 'high' ? '1A' : '1B';
+        if (ticketTier === 1 && ticket.tierType) {
+          // Use the explicit tier type (1A or 1B)
+          tierToCheck = ticket.tierType;
+        } else if (ticketTier === 1) {
+          // Default to 1A if not specified
+          tierToCheck = '1A';
         }
         
-        return hasTicketTierAccess(user.id, ticket.locationId, tierToCheck);
+        // Pass the full ticket to check for time-based escalation
+        return hasTicketTierAccess(user.id, ticket.locationId, tierToCheck, ticket);
       });
     }
     
@@ -558,11 +564,14 @@ const Tickets = () => {
     
     // Determine if the current user has tier access for this ticket
     const ticketTier = ticket.tier || 1;
-    const tierType = ticket.tierType || (ticketTier === 1 && ticket.priority === 'high' ? '1A' : '1B');
+    const tierType = ticket.tierType || (ticketTier === 1 ? '1A' : String(ticketTier));
     
-    // For sub-admins, check tier access permissions
+    // Check if the ticket should be escalated from Tier 1A to 1B
+    const isEscalated = ticketTier === 1 && shouldEscalateToTier1B(ticket);
+    
+    // For sub-admins, check tier access permissions with the full ticket for time-based checks
     const hasTierAccess = user.role === 'subadmin' 
-      ? hasTicketTierAccess(user.id, ticket.locationId, tierType || ticketTier)
+      ? hasTicketTierAccess(user.id, ticket.locationId, tierType || ticketTier, ticket)
       : true; // Root users and others have full access
     
     return (
@@ -848,6 +857,18 @@ const Tickets = () => {
                           color={ticket.tierType === '1A' ? 'error' : 'default'}
                           sx={{ ml: 1 }}
                         />
+                      )}
+                      {/* Show escalation indicator if the ticket is over 24 hours old */}
+                      {shouldEscalateToTier1B(ticket) && (
+                        <Tooltip title={`Escalated to Tier 1B after ${systemConfig.tier1AToTier1BEscalationTime/(1000*60*60)} hours`}>
+                          <Chip 
+                            size="small" 
+                            label="1B Eligible"
+                            color="warning"
+                            variant="outlined"
+                            sx={{ ml: 1 }}
+                          />
+                        </Tooltip>
                       )}
                     </Box>
                   </TableCell>
