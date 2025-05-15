@@ -30,11 +30,16 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip
+  Chip,
+  FormGroup,
+  FormControlLabel,
+  Divider,
+  Menu
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  ArrowDropDown as ArrowDropDownIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -98,7 +103,9 @@ const VendorDetail = () => {
   });
   const [passwordResetError, setPasswordResetError] = useState('');
   const [orgContextDialog, setOrgContextDialog] = useState(false);
-  const [availableOrgs, setAvailableOrgs] = useState([]);
+  const [techOrgSelections, setTechOrgSelections] = useState({});
+  // For the more intuitive tickets filter
+  const [ticketsFilterMenuAnchor, setTicketsFilterMenuAnchor] = useState(null);
 
   // Get vendor data
   const vendor = getVendor(id);
@@ -307,57 +314,79 @@ const VendorDetail = () => {
     setPasswordResetDialog(false);
   };
 
-  // Open add org context dialog
+  // Open organization context management dialog
   const handleOpenOrgContextDialog = (technician) => {
     setSelectedTechnician(technician);
-    // Filter out organizations that the technician already has access to
+    
+    // Initialize the selections based on current org assignments
     const techOrgIds = technician.orgContextIds || [];
-    const orgsToAdd = vendorOrgs.filter(org => !techOrgIds.includes(org.id));
-    setAvailableOrgs(orgsToAdd);
+    const initialSelections = {};
+    
+    // Create an object with all orgs and their selection status
+    vendorOrgs.forEach(org => {
+      initialSelections[org.id] = techOrgIds.includes(org.id);
+    });
+    
+    setTechOrgSelections(initialSelections);
     setOrgContextDialog(true);
   };
-
-  // Add organization context to technician
-  const handleAddOrgContext = (techId, orgId) => {
+  
+  // Handle checkbox change for technician org context
+  const handleOrgSelectionChange = (orgId) => {
+    setTechOrgSelections(prev => ({
+      ...prev,
+      [orgId]: !prev[orgId]
+    }));
+  };
+  
+  // Save technician organization contexts
+  const handleSaveOrgContexts = () => {
     // In a real app, this would update the technician's organization associations in the database
     // For this demo, we'll just show a success message and update the UI
     
-    // Find the technician and add the organization to their context
-    const techIndex = technicians.findIndex(t => t.id === techId);
+    if (!selectedTechnician) return;
+    
+    // Get the selected org IDs
+    const newOrgContextIds = Object.entries(techOrgSelections)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([orgId]) => orgId);
+    
+    // Find the technician and update their org contexts
+    const techIndex = technicians.findIndex(t => t.id === selectedTechnician.id);
     if (techIndex !== -1) {
       const updatedTech = { ...technicians[techIndex] };
-      updatedTech.orgContextIds = [...(updatedTech.orgContextIds || []), orgId];
+      updatedTech.orgContextIds = newOrgContextIds;
       
       // Update the technicians array (this is just for UI demo - would be handled by API in real app)
       const updatedTechnicians = [...technicians];
       updatedTechnicians[techIndex] = updatedTech;
       // In real app we would update the state with the response from API
       
-      alert(`Organization context added to ${updatedTech.name}`);
+      alert(`Organization contexts updated for ${updatedTech.name}`);
       setOrgContextDialog(false);
     }
   };
-
-  // Remove organization context from technician
-  const handleRemoveOrgContext = (techId, orgId) => {
-    // In a real app, this would update the technician's organization associations in the database
-    // For this demo, we'll just show a confirmation and update the UI
-    
-    if (window.confirm('Are you sure you want to remove this organization context?')) {
-      // Find the technician and remove the organization from their context
-      const techIndex = technicians.findIndex(t => t.id === techId);
-      if (techIndex !== -1) {
-        const updatedTech = { ...technicians[techIndex] };
-        updatedTech.orgContextIds = updatedTech.orgContextIds?.filter(id => id !== orgId) || [];
-        
-        // Update the technicians array (this is just for UI demo - would be handled by API in real app)
-        const updatedTechnicians = [...technicians];
-        updatedTechnicians[techIndex] = updatedTech;
-        // In real app we would update the state with the response from API
-        
-        alert(`Organization context removed from ${updatedTech.name}`);
-      }
-    }
+  
+  // Handle filter menu open for tickets
+  const handleFilterMenuOpen = (event) => {
+    setTicketsFilterMenuAnchor(event.currentTarget);
+  };
+  
+  // Handle filter menu close
+  const handleFilterMenuClose = () => {
+    setTicketsFilterMenuAnchor(null);
+  };
+  
+  // Handle organization filter selection
+  const handleOrgFilterSelect = (orgId) => {
+    setSelectedOrgId(selectedOrgId === orgId ? null : orgId);
+    handleFilterMenuClose();
+  };
+  
+  // Handle clearing ticket filter
+  const handleClearTicketFilter = () => {
+    setSelectedOrgId(null);
+    handleFilterMenuClose();
   };
 
   return (
@@ -444,38 +473,32 @@ const VendorDetail = () => {
           </Box>
 
           {/* Organization filter for technicians */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" gutterBottom>Filter by Organization</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {selectedTechOrgId && (
-                <Chip
-                  label="Clear Filter"
-                  variant="outlined"
-                  onClick={() => setSelectedTechOrgId(null)}
-                  sx={{ cursor: 'pointer' }}
-                />
-              )}
-              {vendorOrgs.map(org => {
-                const colors = getOrgColor(org.id);
-                return (
-                  <Chip
-                    key={org.id}
-                    label={org.name}
-                    onClick={() => setSelectedTechOrgId(selectedTechOrgId === org.id ? null : org.id)}
-                    sx={{
-                      cursor: 'pointer',
-                      backgroundColor: selectedTechOrgId === org.id ? colors.bg : 'transparent',
-                      borderColor: selectedTechOrgId === org.id ? colors.border : 'rgba(0, 0, 0, 0.23)',
-                      border: '1px solid',
-                      fontWeight: selectedTechOrgId === org.id ? 'bold' : 'normal',
-                      '&:hover': {
-                        backgroundColor: colors.bg
-                      }
-                    }}
-                  />
-                );
-              })}
-            </Box>
+          <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <FormControl variant="outlined" size="small" sx={{ minWidth: 200 }}>
+              <InputLabel id="tech-org-filter-label">Filter by Organization</InputLabel>
+              <Select
+                labelId="tech-org-filter-label"
+                id="tech-org-filter"
+                value={selectedTechOrgId || ''}
+                onChange={(e) => setSelectedTechOrgId(e.target.value || null)}
+                label="Filter by Organization"
+              >
+                <MenuItem value="">All Organizations</MenuItem>
+                {vendorOrgs.map(org => (
+                  <MenuItem key={org.id} value={org.id}>{org.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {selectedTechOrgId && (
+              <Button 
+                variant="outlined" 
+                size="small" 
+                onClick={() => setSelectedTechOrgId(null)}
+              >
+                Clear Filter
+              </Button>
+            )}
           </Box>
 
           <TableContainer component={Paper}>
@@ -505,32 +528,25 @@ const VendorDetail = () => {
                       <TableCell>{tech.email}</TableCell>
                       <TableCell>{tech.phone}</TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {tech.orgContextIds && tech.orgContextIds.map(orgId => {
-                            const org = organizations.find(o => o.id === orgId);
-                            const colors = getOrgColor(orgId);
-                            return org ? (
-                              <Chip 
-                                key={orgId} 
-                                label={org.name} 
-                                size="small"
-                                sx={{
-                                  backgroundColor: colors.bg,
-                                  border: '1px solid',
-                                  borderColor: colors.border
-                                }} 
-                                onDelete={() => handleRemoveOrgContext(tech.id, orgId)}
-                              />
-                            ) : null;
-                          })}
-                          <Chip 
-                            icon={<AddIcon />} 
-                            label="Add" 
-                            size="small" 
-                            variant="outlined" 
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box>
+                            {tech.orgContextIds && tech.orgContextIds.length > 0 ? (
+                              <Typography variant="body2">
+                                {tech.orgContextIds.length} organization{tech.orgContextIds.length !== 1 ? 's' : ''} assigned
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                No organizations assigned
+                              </Typography>
+                            )}
+                          </Box>
+                          <Button
+                            size="small"
+                            variant="outlined"
                             onClick={() => handleOpenOrgContextDialog(tech)}
-                            sx={{ cursor: 'pointer' }}
-                          />
+                          >
+                            Manage Organizations
+                          </Button>
                         </Box>
                       </TableCell>
                       <TableCell align="right">
@@ -556,42 +572,61 @@ const VendorDetail = () => {
             <Typography variant="h6">Tickets Assigned to {vendor.name}</Typography>
           </Box>
           
-          {/* Organization filter */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" gutterBottom>Filter by Organization</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {selectedOrgId && (
-                <Chip
-                  label="Clear Filter"
-                  variant="outlined"
-                  onClick={() => setSelectedOrgId(null)}
-                  sx={{ cursor: 'pointer' }}
-                />
-              )}
+          {/* Organization filter dropdown */}
+          <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="outlined"
+              endIcon={<ArrowDropDownIcon />}
+              onClick={handleFilterMenuOpen}
+              sx={{ minWidth: 220, justifyContent: 'space-between' }}
+            >
+              {selectedOrgId 
+                ? `Filter: ${organizations.find(o => o.id === selectedOrgId)?.name}` 
+                : "Filter by Organization"}
+            </Button>
+            
+            {selectedOrgId && (
+              <Button 
+                variant="outlined" 
+                size="small" 
+                onClick={handleClearTicketFilter}
+              >
+                Clear Filter
+              </Button>
+            )}
+            
+            <Menu
+              anchorEl={ticketsFilterMenuAnchor}
+              open={Boolean(ticketsFilterMenuAnchor)}
+              onClose={handleFilterMenuClose}
+            >
+              <MenuItem onClick={handleClearTicketFilter}>
+                <Typography sx={{ fontWeight: !selectedOrgId ? 'bold' : 'normal' }}>
+                  All Organizations
+                </Typography>
+              </MenuItem>
+              <Divider />
               {vendorOrgs.map(org => {
                 const colors = getOrgColor(org.id);
                 return (
-                  <Chip
-                    key={org.id}
-                    label={org.name}
-                    onClick={() => setSelectedOrgId(selectedOrgId === org.id ? null : org.id)}
+                  <MenuItem 
+                    key={org.id} 
+                    onClick={() => handleOrgFilterSelect(org.id)}
                     sx={{
-                      cursor: 'pointer',
                       backgroundColor: selectedOrgId === org.id ? colors.bg : 'transparent',
-                      borderColor: selectedOrgId === org.id ? colors.border : 'rgba(0, 0, 0, 0.23)',
-                      border: '1px solid',
-                      fontWeight: selectedOrgId === org.id ? 'bold' : 'normal',
-                      '&:hover': {
-                        backgroundColor: colors.bg
-                      }
                     }}
-                  />
+                  >
+                    <Typography sx={{ fontWeight: selectedOrgId === org.id ? 'bold' : 'normal' }}>
+                      {org.name}
+                    </Typography>
+                  </MenuItem>
                 );
               })}
-            </Box>
+            </Menu>
+            
             {selectedOrgId && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Showing {filteredTickets.length} ticket(s) for {organizations.find(o => o.id === selectedOrgId)?.name}
+              <Typography variant="body2" color="text.secondary">
+                Showing {filteredTickets.length} ticket(s)
               </Typography>
             )}
           </Box>
@@ -882,42 +917,62 @@ const VendorDetail = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Add Organization Context for {selectedTechnician?.name}</DialogTitle>
+        <DialogTitle>Manage Organizations for {selectedTechnician?.name}</DialogTitle>
         <DialogContent>
-          {availableOrgs.length === 0 ? (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              This technician already has access to all available organizations.
-            </Alert>
-          ) : (
-            <>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2, mt: 1 }}>
-                Select organizations where this technician can access tickets and perform work:
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {availableOrgs.map(org => {
-                  const colors = getOrgColor(org.id);
-                  return (
-                    <Chip
-                      key={org.id}
-                      label={org.name}
-                      onClick={() => handleAddOrgContext(selectedTechnician?.id, org.id)}
-                      sx={{
-                        cursor: 'pointer',
-                        border: '1px solid',
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, mt: 1 }}>
+            Select organizations where this technician can access tickets and perform work:
+          </Typography>
+          
+          <FormControl component="fieldset" sx={{ width: '100%' }}>
+            <FormGroup>
+              {vendorOrgs.map(org => {
+                const colors = getOrgColor(org.id);
+                return (
+                  <FormControlLabel
+                    key={org.id}
+                    control={
+                      <Checkbox 
+                        checked={!!techOrgSelections[org.id]} 
+                        onChange={() => handleOrgSelectionChange(org.id)}
+                        sx={{
+                          '&.Mui-checked': {
+                            color: colors.border,
+                          }
+                        }}
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="body1">{org.name}</Typography>
+                      </Box>
+                    }
+                    sx={{
+                      padding: '8px',
+                      margin: '2px 0',
+                      borderRadius: '4px',
+                      '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)' },
+                      ...(!!techOrgSelections[org.id] ? {
+                        backgroundColor: colors.bg,
                         borderColor: colors.border,
-                        '&:hover': {
-                          backgroundColor: colors.bg
-                        }
-                      }}
-                    />
-                  );
-                })}
-              </Box>
-            </>
+                      } : {})
+                    }}
+                  />
+                );
+              })}
+            </FormGroup>
+          </FormControl>
+          
+          {vendorOrgs.length === 0 && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              No organizations available for this vendor.
+            </Alert>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOrgContextDialog(false)}>Close</Button>
+          <Button onClick={() => setOrgContextDialog(false)}>Cancel</Button>
+          <Button onClick={handleSaveOrgContexts} variant="contained" color="primary">
+            Save Changes
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
