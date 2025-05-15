@@ -319,8 +319,17 @@ const SubAdmins = () => {
       
       let updatedTiers;
       if (checked) {
-        // Add tier if not already included
-        updatedTiers = [...locationPermissions.tiers, tier].filter((v, i, a) => a.indexOf(v) === i);
+        // Special handling for Tier 1A and Tier 1B - they're mutually exclusive
+        if (tier === '1A' || tier === '1B') {
+          // Remove the other tier 1 option if it exists
+          const otherTier = tier === '1A' ? '1B' : '1A';
+          updatedTiers = locationPermissions.tiers.filter(t => t !== otherTier);
+          // Add the selected tier
+          updatedTiers.push(tier);
+        } else {
+          // For other tiers, just add if not already included
+          updatedTiers = [...locationPermissions.tiers, tier].filter((v, i, a) => a.indexOf(v) === i);
+        }
       } else {
         // Remove tier
         updatedTiers = locationPermissions.tiers.filter(t => t !== tier);
@@ -946,12 +955,22 @@ const SubAdmins = () => {
                                     <FormControlLabel
                                       control={
                                         <Checkbox
-                                          checked={locationPermissions.tiers?.includes(1) || false}
-                                          onChange={(e) => handleTierPermissionChange(loc.id, 1, e.target.checked)}
+                                          checked={locationPermissions.tiers?.includes('1A') || false}
+                                          onChange={(e) => handleTierPermissionChange(loc.id, '1A', e.target.checked)}
                                           size="small"
                                         />
                                       }
-                                      label={<Typography variant="body2">Tier 1</Typography>}
+                                      label={<Typography variant="body2">Tier 1A (Top Priority)</Typography>}
+                                    />
+                                    <FormControlLabel
+                                      control={
+                                        <Checkbox
+                                          checked={locationPermissions.tiers?.includes('1B') || false}
+                                          onChange={(e) => handleTierPermissionChange(loc.id, '1B', e.target.checked)}
+                                          size="small"
+                                        />
+                                      }
+                                      label={<Typography variant="body2">Tier 1B</Typography>}
                                     />
                                     <FormControlLabel
                                       control={
