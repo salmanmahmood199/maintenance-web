@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -126,14 +126,21 @@ const VendorDetail = () => {
     );
   }
 
+  // State for technicians list
+  const [technicians, setTechnicians] = useState([]);
+  
   // Get related data
-  const technicians = getTechnicians(id);
   const organizations = getOrganizations();
   const vendorOrgs = organizations.filter(org => vendor.orgIds.includes(org.id));
   
   // Get tickets assigned to this vendor
   const allTickets = getTickets();
   const vendorTickets = allTickets.filter(ticket => ticket.assignedVendorId === id);
+  
+  // Load technicians when component mounts
+  useEffect(() => {
+    setTechnicians(getTechnicians(id));
+  }, [id, getTechnicians]);
   
   // Function to get consistent color for organization
   const getOrgColor = (orgId) => {
@@ -360,7 +367,9 @@ const VendorDetail = () => {
       // Update the technicians array (this is just for UI demo - would be handled by API in real app)
       const updatedTechnicians = [...technicians];
       updatedTechnicians[techIndex] = updatedTech;
-      // In real app we would update the state with the response from API
+      
+      // Set the updated technicians state to trigger a re-render
+      setTechnicians(updatedTechnicians);
       
       alert(`Organization contexts updated for ${updatedTech.name}`);
       setOrgContextDialog(false);
