@@ -894,6 +894,52 @@ export const DataProvider = ({ children }) => {
     return subAdmin.assignedLocationIds.includes(locationId);
   };
   
+  // Check if a sub-admin can handle tickets of a specific tier for a location
+  const hasTicketTierAccess = (subAdminId, locationId, tier) => {
+    if (!subAdminId || !locationId) return false;
+    
+    // Get the sub-admin record
+    const subAdmin = getItem('subAdmins', subAdminId);
+    if (!subAdmin) return false;
+    
+    // First check if they have basic location access
+    if (!hasLocationAccess(subAdminId, locationId)) return false;
+    
+    // Check if they have the basic accept ticket permission
+    if (!subAdmin.permissions?.includes('subadmin.acceptTicket')) return false;
+    
+    // For location-specific tier permissions
+    if (subAdmin.locationTierPermissions && subAdmin.locationTierPermissions[locationId]) {
+      const locationPermissions = subAdmin.locationTierPermissions[locationId];
+      
+      // Check if they can accept tickets for this location
+      if (!locationPermissions.acceptTicket) return false;
+      
+      // Handle Tier 1A and 1B as special cases
+      if (tier === 1) {
+        // For Tier 1, check if they have either 1A or 1B access
+        return locationPermissions.tiers?.includes('1A') || locationPermissions.tiers?.includes('1B');
+      } else if (tier === '1A' || tier === '1B') {
+        // Direct check for specific tier
+        return locationPermissions.tiers?.includes(tier);
+      } else {
+        // For Tier 2 and 3, check numeric values
+        return locationPermissions.tiers?.includes(tier);
+      }
+    }
+    
+    // If no location-specific permissions are set, fall back to the general permissions
+    // (this is for backward compatibility)
+    if (tier === 2) {
+      return subAdmin.permissions?.includes('subadmin.tier2AcceptTicket');
+    } else if (tier === 3) {
+      return subAdmin.permissions?.includes('subadmin.tier3AcceptTicket');
+    }
+    
+    // For tier 1, the basic acceptTicket permission is sufficient
+    return true;
+  };
+  
   // Get all locations a sub-admin has access to
   const getAccessibleLocations = (subAdminId) => {
     if (!subAdminId) return [];
@@ -990,6 +1036,7 @@ export const DataProvider = ({ children }) => {
     
     // Location Access Control
     hasLocationAccess,
+    hasTicketTierAccess,
     getAccessibleLocations
   };
 

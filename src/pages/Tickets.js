@@ -49,6 +49,7 @@ import {
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { useParams } from 'react-router-dom';
 
 // Issue types
 const ISSUE_TYPES = [
@@ -96,6 +97,7 @@ const Tickets = () => {
     completeWork,
     verifyCompletion,
     hasLocationAccess,
+    hasTicketTierAccess,
     getAccessibleLocations
   } = useData();
 
@@ -140,10 +142,30 @@ const Tickets = () => {
     
     let filtered = [...tickets];
     
+    // First filter tickets by tier access if the user is a sub-admin
+    if (user && user.role === 'subadmin') {
+      filtered = filtered.filter(ticket => {
+        // Check if the sub-admin has tier access for this ticket's location
+        // If the ticket has tier property, use it, otherwise default to 1
+        const ticketTier = ticket.tier || 1;
+        
+        // Special handling for priority tiers
+        let tierToCheck = ticketTier;
+        
+        // For Tier 1 tickets, use the priority designation if available
+        if (ticketTier === 1 && ticket.priority) {
+          // High priority tickets are considered 1A, others 1B
+          tierToCheck = ticket.priority === 'high' ? '1A' : '1B';
+        }
+        
+        return hasTicketTierAccess(user.id, ticket.locationId, tierToCheck);
+      });
+    }
+    
     // Filter by ticket number
     if (filters.ticketNo) {
       filtered = filtered.filter(ticket => 
-        ticket.ticketNo?.toLowerCase().includes(filters.ticketNo.toLowerCase())
+        ticket.ticketNo.toLowerCase().includes(filters.ticketNo.toLowerCase())
       );
     }
     
@@ -182,7 +204,7 @@ const Tickets = () => {
     
     setFilteredTickets(filtered);
   }, [tickets, filters]);
-  
+
   // Handle filter changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -356,37 +378,52 @@ const Tickets = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
-      // In a real application, we would upload files to storage here
-      // and get back URLs to store in the ticket
-      // For this demo, we'll just simulate it
+      // Validation
+      if (!formData.locationId || !formData.issueType || !formData.description) {
+        alert('Please fill in all required fields');
+        return;
+      }
       
-      // Simulate file uploads and get URLs
-      const mediaUrls = selectedFiles.map((file, index) => {
-        // In a real app, we'd upload the file and get a real URL
-        // Here we're just creating fake URLs as a demonstration
-        return `https://example.com/uploads/${Date.now()}-${index}-${file.name}`;
-      });
+      // Determine initial tier based on priority
+      // Tier 1 is default, but we'll set an additional property for 1A/1B distinction
+      let ticketTier = 1;
+      let is1A = formData.priority === 'high';
       
-      // Create the final ticket data with all fields
-      const ticketData = {
+      // Create ticket data
+      const newTicket = {
         ...formData,
-        mediaUrls,
-        timestamp: new Date().toISOString(), // Ensure we have the current timestamp
-        status: 'New' // Default status for new tickets
+        status: 'New',
+        tier: ticketTier,       // Numeric tier (1, 2, or 3)
+        tierType: is1A ? '1A' : '1B', // String designation for Tier 1 subtypes
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: user?.id || 'anonymous',
+        workOrders: []
       };
       
-      console.log('Creating ticket with data:', ticketData);
-      await addTicket(ticketData);
+      // Add ticket
+      await addTicket(newTicket);
       
-      // Refresh tickets data after adding a new one
-      const newTickets = await getTickets();
-      setTickets(newTickets || []);
+      // Refresh tickets
+      const updatedTickets = await getTickets();
+      setTickets(updatedTickets || []);
       
-      handleCloseDialog();
+      // Close dialog and reset form
+      setDialogOpen(false);
+      setFormData({
+        ticketNo: generateTempTicketNo(),
+        locationId: '',
+        issueType: '',
+        description: '',
+        files: [],
+        status: 'New',
+        priority: 'medium'
+      });
     } catch (error) {
-      console.error('Error adding ticket:', error);
-      alert(`Error adding ticket: ${error.message}`);
+      console.error('Error creating ticket:', error);
+      alert(`Error creating ticket: ${error.message}`);
     }
   };
 
@@ -509,91 +546,103 @@ const Tickets = () => {
     }
   };
 
-  // Render action buttons based on ticket status
+  // Render action buttons based on ticket status and tier access
   const renderActionButtons = (ticket) => {
-    const { status } = ticket;
+    if (!ticket) return null;
     
-    // For MVP, allow any action regardless of role
-    switch (status) {
-      case 'New':
-        return (
-          <Button
-            variant="contained"
-            startIcon={<AssignIcon />}
-            onClick={() => handleActionClick('assign')}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            Assign to Vendor
-          </Button>
-        );
-      case 'Assigned':
-        return (
-          <Button
-            variant="contained"
-            color="info"
-            startIcon={<StartIcon />}
-            onClick={() => handleActionClick('start')}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            Start Work
-          </Button>
-        );
-      case 'In Progress':
-        return (
-          <Box>
-            <Button
-              variant="contained"
-              color="warning"
-              startIcon={<PauseIcon />}
+    const currentStepInfo = determineCurrentStep(ticket) || {};
+    const isAssigned = ticket.assignedVendorId;
+    const isInProgress = ticket.status === 'In Progress';
+    const isPaused = ticket.status === 'Paused';
+    const isCompleted = ticket.status === 'Completed';
+    
+    // Determine if the current user has tier access for this ticket
+    const ticketTier = ticket.tier || 1;
+    const tierType = ticket.tierType || (ticketTier === 1 && ticket.priority === 'high' ? '1A' : '1B');
+    
+    // For sub-admins, check tier access permissions
+    const hasTierAccess = user.role === 'subadmin' 
+      ? hasTicketTierAccess(user.id, ticket.locationId, tierType || ticketTier)
+      : true; // Root users and others have full access
+    
+    return (
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        {/* Assign Button - Only show if user has tier access */}
+        {!isAssigned && ticket.status === 'New' && hasTierAccess && (
+          <Tooltip title="Assign to Vendor">
+            <IconButton 
+              color="primary" 
+              onClick={() => handleActionClick('assign')}
+              size="small"
+            >
+              <AssignIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        
+        {/* Start Work Button */}
+        {isAssigned && !isInProgress && !isCompleted && !isPaused && hasTierAccess && (
+          <Tooltip title="Start Work">
+            <IconButton 
+              color="primary" 
+              onClick={() => handleActionClick('start')}
+              size="small"
+            >
+              <StartIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        
+        {/* Pause Work Button */}
+        {isInProgress && hasTierAccess && (
+          <Tooltip title="Pause Work">
+            <IconButton 
+              color="warning" 
               onClick={() => handleActionClick('pause')}
-              fullWidth
-              sx={{ mb: 1 }}
+              size="small"
             >
-              Pause Work
-            </Button>
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<CompleteIcon />}
+              <PauseIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        
+        {/* Complete Work Button */}
+        {(isInProgress || isPaused) && hasTierAccess && (
+          <Tooltip title="Mark Completed">
+            <IconButton 
+              color="success" 
               onClick={() => handleActionClick('complete')}
-              fullWidth
-              sx={{ mb: 1 }}
+              size="small"
             >
-              Complete Work
-            </Button>
-          </Box>
-        );
-      case 'Paused':
-        return (
-          <Button
-            variant="contained"
-            color="info"
-            startIcon={<StartIcon />}
-            onClick={() => handleActionClick('start')}
-            fullWidth
-            sx={{ mb: 1 }}
+              <CompleteIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        
+        {/* Verify Button */}
+        {isCompleted && hasTierAccess && (
+          <Tooltip title="Verify Completion">
+            <IconButton 
+              color="secondary" 
+              onClick={() => handleActionClick('verify')}
+              size="small"
+            >
+              <VerifyIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        
+        {/* View Button - Always Available */}
+        <Tooltip title="View Details">
+          <IconButton 
+            onClick={() => handleViewTicket(ticket.id)}
+            size="small"
           >
-            Resume Work
-          </Button>
-        );
-      case 'Completed':
-        return (
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={<VerifyIcon />}
-            onClick={() => handleActionClick('verify')}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            Verify Completion
-          </Button>
-        );
-      default:
-        return null;
-    }
+            <VisibilityIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    );
   };
 
   return (
@@ -763,6 +812,7 @@ const Tickets = () => {
               <TableCell>Date/Time</TableCell>
               <TableCell>Location</TableCell>
               <TableCell>Issue Type</TableCell>
+              <TableCell>Priority/Tier</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Assigned To</TableCell>
               <TableCell>Actions</TableCell>
@@ -771,7 +821,7 @@ const Tickets = () => {
           <TableBody>
             {filteredTickets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   {tickets.length > 0 ? 'No tickets match the current filters' : 'No tickets found'}
                 </TableCell>
               </TableRow>
@@ -783,6 +833,23 @@ const Tickets = () => {
                   <TableCell>{getLocationName(ticket.locationId)}</TableCell>
                   <TableCell>
                     {ISSUE_TYPES.find(type => type.value === ticket.issueType)?.label || ticket.issueType}
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Chip 
+                        label={ticket.priority || 'Medium'} 
+                        size="small"
+                        color={ticket.priority === 'high' ? 'error' : ticket.priority === 'low' ? 'default' : 'primary'}
+                      />
+                      {ticket.tierType && (
+                        <Chip 
+                          size="small" 
+                          label={`Tier ${ticket.tierType}`}
+                          color={ticket.tierType === '1A' ? 'error' : 'default'}
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Chip 
