@@ -144,29 +144,9 @@ const Tickets = () => {
     
     let filtered = [...tickets];
     
-    // First filter tickets by tier access if the user is a sub-admin
-    if (user && user.role === 'subadmin') {
-      filtered = filtered.filter(ticket => {
-        // Check if the sub-admin has tier access for this ticket's location
-        // If the ticket has tier property, use it, otherwise default to 1
-        const ticketTier = ticket.tier || 1;
-        
-        // Special handling for priority tiers
-        let tierToCheck = ticketTier;
-        
-        // For Tier 1 tickets, use the priority designation if available
-        if (ticketTier === 1 && ticket.tierType) {
-          // Use the explicit tier type (1A or 1B)
-          tierToCheck = ticket.tierType;
-        } else if (ticketTier === 1) {
-          // Default to 1A if not specified
-          tierToCheck = '1A';
-        }
-        
-        // Pass the full ticket to check for time-based escalation
-        return hasTicketTierAccess(user.id, ticket.locationId, tierToCheck, ticket);
-      });
-    }
+    // For subadmins, we only filter by location access, not by tier access
+    // This allows subadmins to view all tickets for locations they have access to
+    // Actions on tickets will still be restricted by permissions
     
     // Filter by ticket number
     if (filters.ticketNo) {
@@ -283,6 +263,7 @@ const Tickets = () => {
             // Get tickets for each location the user has access to
             const locationIds = availableLocations.map(loc => loc.id);
             const allTickets = await getTickets();
+            // Simply filter by location access - allow subadmins to see all tickets for their locations
             ticketsList = allTickets.filter(ticket => locationIds.includes(ticket.locationId));
           }
           setTickets(ticketsList);
