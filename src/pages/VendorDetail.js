@@ -86,9 +86,24 @@ const VendorDetail = () => {
     orgContextIds: []
   });
   const [formErrors, setFormErrors] = useState({});
+  // State for organization filter
+  const [selectedOrgId, setSelectedOrgId] = useState(null);
+  // State for technician filtering and actions
+  const [selectedTechOrgId, setSelectedTechOrgId] = useState(null);
+  const [passwordResetDialog, setPasswordResetDialog] = useState(false);
+  const [selectedTechnician, setSelectedTechnician] = useState(null);
+  const [passwordResetForm, setPasswordResetForm] = useState({
+    password: '',
+    confirmPassword: ''
+  });
+  const [passwordResetError, setPasswordResetError] = useState('');
+  const [orgContextDialog, setOrgContextDialog] = useState(false);
+  const [availableOrgs, setAvailableOrgs] = useState([]);
 
   // Get vendor data
   const vendor = getVendor(id);
+  
+  // Early return if vendor not found - must be after all useState calls
   if (!vendor) {
     return (
       <Box sx={{ p: 3 }}>
@@ -112,6 +127,29 @@ const VendorDetail = () => {
   // Get tickets assigned to this vendor
   const allTickets = getTickets();
   const vendorTickets = allTickets.filter(ticket => ticket.assignedVendorId === id);
+  
+  // Function to get consistent color for organization
+  const getOrgColor = (orgId) => {
+    if (!orgId) return { bg: '#f5f5f5', border: '#e0e0e0' };
+    
+    // Create a deterministic hash from the orgId
+    const hash = orgId.split('').reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+    
+    // Generate a hue value from 0-360 based on the hash
+    const hue = Math.abs(hash % 360);
+    
+    return {
+      bg: `hsla(${hue}, 70%, 90%, 0.2)`,
+      border: `hsla(${hue}, 70%, 50%, 0.5)`
+    };
+  };
+  
+  // Filter tickets by selected organization
+  const filteredTickets = selectedOrgId 
+    ? vendorTickets.filter(ticket => ticket.orgId === selectedOrgId)
+    : vendorTickets;
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -193,31 +231,132 @@ const VendorDetail = () => {
       setFormErrors(errors);
       return;
     }
-
+    
     try {
       // Add technician
-      addTechnician({
-        name: technicianForm.name,
-        email: technicianForm.email,
-        phone: technicianForm.phone,
-        password: technicianForm.password,
-        vendorId: id,
-        orgContextIds: technicianForm.orgContextIds
+      const result = addTechnician({
+        ...technicianForm,
+        vendorId: id
       });
-
-      // Reset form and close dialog
-      setTechnicianForm({
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        confirmPassword: '',
-        orgContextIds: []
-      });
-      setFormErrors({});
-      setTechnicianDialog(false);
+      
+      if (result.success) {
+        // Close dialog and reset form
+        setTechnicianDialog(false);
+        setTechnicianForm({
+          name: '',
+          email: '',
+          phone: '',
+          password: '',
+          confirmPassword: '',
+          orgContextIds: []
+        });
+        setFormErrors({});
+      } else {
+        setFormErrors({
+          ...formErrors,
+          submit: result.error || 'Failed to add technician'
+        });
+      }
     } catch (error) {
-      setFormErrors({ submit: error.message });
+      console.error('Error adding technician:', error);
+      setFormErrors({
+        ...formErrors,
+        submit: 'An unexpected error occurred'
+      });
+    }
+  };
+
+  // Handle password reset dialog open
+  const handlePasswordResetOpen = (technician) => {
+    setSelectedTechnician(technician);
+    setPasswordResetForm({
+      password: '',
+      confirmPassword: ''
+    });
+    setPasswordResetError('');
+    setPasswordResetDialog(true);
+  };
+
+  // Handle password reset form change
+  const handlePasswordResetChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordResetForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Handle password reset submit
+  const handlePasswordResetSubmit = () => {
+    // Validate password
+    if (!passwordResetForm.password) {
+      setPasswordResetError('Password is required');
+      return;
+    }
+
+    if (passwordResetForm.password !== passwordResetForm.confirmPassword) {
+      setPasswordResetError('Passwords do not match');
+      return;
+    }
+
+    if (!isPasswordStrong(passwordResetForm.password)) {
+      setPasswordResetError('Password must be at least 8 characters with at least one letter and number');
+      return;
+    }
+
+    // In a real app, this would call an API to update the password
+    // For this demo, we'll just show a success message
+    alert(`Password for ${selectedTechnician.name} has been reset successfully`);
+    setPasswordResetDialog(false);
+  };
+
+  // Open add org context dialog
+  const handleOpenOrgContextDialog = (technician) => {
+    setSelectedTechnician(technician);
+    // Filter out organizations that the technician already has access to
+    const techOrgIds = technician.orgContextIds || [];
+    const orgsToAdd = vendorOrgs.filter(org => !techOrgIds.includes(org.id));
+    setAvailableOrgs(orgsToAdd);
+    setOrgContextDialog(true);
+  };
+
+  // Add organization context to technician
+  const handleAddOrgContext = (techId, orgId) => {
+    // In a real app, this would update the technician's organization associations in the database
+    // For this demo, we'll just show a success message and update the UI
+    
+    // Find the technician and add the organization to their context
+    const techIndex = technicians.findIndex(t => t.id === techId);
+    if (techIndex !== -1) {
+      const updatedTech = { ...technicians[techIndex] };
+      updatedTech.orgContextIds = [...(updatedTech.orgContextIds || []), orgId];
+      
+      // Update the technicians array (this is just for UI demo - would be handled by API in real app)
+      const updatedTechnicians = [...technicians];
+      updatedTechnicians[techIndex] = updatedTech;
+      // In real app we would update the state with the response from API
+      
+      alert(`Organization context added to ${updatedTech.name}`);
+      setOrgContextDialog(false);
+    }
+  };
+
+  // Remove organization context from technician
+  const handleRemoveOrgContext = (techId, orgId) => {
+    // In a real app, this would update the technician's organization associations in the database
+    // For this demo, we'll just show a confirmation and update the UI
+    
+    if (window.confirm('Are you sure you want to remove this organization context?')) {
+      // Find the technician and remove the organization from their context
+      const techIndex = technicians.findIndex(t => t.id === techId);
+      if (techIndex !== -1) {
+        const updatedTech = { ...technicians[techIndex] };
+        updatedTech.orgContextIds = updatedTech.orgContextIds?.filter(id => id !== orgId) || [];
+        
+        // Update the technicians array (this is just for UI demo - would be handled by API in real app)
+        const updatedTechnicians = [...technicians];
+        updatedTechnicians[techIndex] = updatedTech;
+        // In real app we would update the state with the response from API
+        
+        alert(`Organization context removed from ${updatedTech.name}`);
+      }
     }
   };
 
@@ -304,6 +443,41 @@ const VendorDetail = () => {
             </Button>
           </Box>
 
+          {/* Organization filter for technicians */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" gutterBottom>Filter by Organization</Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {selectedTechOrgId && (
+                <Chip
+                  label="Clear Filter"
+                  variant="outlined"
+                  onClick={() => setSelectedTechOrgId(null)}
+                  sx={{ cursor: 'pointer' }}
+                />
+              )}
+              {vendorOrgs.map(org => {
+                const colors = getOrgColor(org.id);
+                return (
+                  <Chip
+                    key={org.id}
+                    label={org.name}
+                    onClick={() => setSelectedTechOrgId(selectedTechOrgId === org.id ? null : org.id)}
+                    sx={{
+                      cursor: 'pointer',
+                      backgroundColor: selectedTechOrgId === org.id ? colors.bg : 'transparent',
+                      borderColor: selectedTechOrgId === org.id ? colors.border : 'rgba(0, 0, 0, 0.23)',
+                      border: '1px solid',
+                      fontWeight: selectedTechOrgId === org.id ? 'bold' : 'normal',
+                      '&:hover': {
+                        backgroundColor: colors.bg
+                      }
+                    }}
+                  />
+                );
+              })}
+            </Box>
+          </Box>
+
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -312,17 +486,20 @@ const VendorDetail = () => {
                   <TableCell>Email</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Organization Context</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {technicians.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} align="center">
+                    <TableCell colSpan={5} align="center">
                       No technicians found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  technicians.map((tech) => (
+                  technicians
+                    .filter(tech => selectedTechOrgId ? tech.orgContextIds?.includes(selectedTechOrgId) : true)
+                    .map((tech) => (
                     <TableRow key={tech.id}>
                       <TableCell>{tech.name}</TableCell>
                       <TableCell>{tech.email}</TableCell>
@@ -331,17 +508,39 @@ const VendorDetail = () => {
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                           {tech.orgContextIds && tech.orgContextIds.map(orgId => {
                             const org = organizations.find(o => o.id === orgId);
+                            const colors = getOrgColor(orgId);
                             return org ? (
                               <Chip 
                                 key={orgId} 
                                 label={org.name} 
-                                size="small" 
-                                color="primary" 
-                                variant="outlined" 
+                                size="small"
+                                sx={{
+                                  backgroundColor: colors.bg,
+                                  border: '1px solid',
+                                  borderColor: colors.border
+                                }} 
+                                onDelete={() => handleRemoveOrgContext(tech.id, orgId)}
                               />
                             ) : null;
                           })}
+                          <Chip 
+                            icon={<AddIcon />} 
+                            label="Add" 
+                            size="small" 
+                            variant="outlined" 
+                            onClick={() => handleOpenOrgContextDialog(tech)}
+                            sx={{ cursor: 'pointer' }}
+                          />
                         </Box>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          onClick={() => handlePasswordResetOpen(tech)}
+                          color="primary"
+                        >
+                          Reset Password
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -355,6 +554,46 @@ const VendorDetail = () => {
         <TabPanel value={tabValue} index={1}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">Tickets Assigned to {vendor.name}</Typography>
+          </Box>
+          
+          {/* Organization filter */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" gutterBottom>Filter by Organization</Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {selectedOrgId && (
+                <Chip
+                  label="Clear Filter"
+                  variant="outlined"
+                  onClick={() => setSelectedOrgId(null)}
+                  sx={{ cursor: 'pointer' }}
+                />
+              )}
+              {vendorOrgs.map(org => {
+                const colors = getOrgColor(org.id);
+                return (
+                  <Chip
+                    key={org.id}
+                    label={org.name}
+                    onClick={() => setSelectedOrgId(selectedOrgId === org.id ? null : org.id)}
+                    sx={{
+                      cursor: 'pointer',
+                      backgroundColor: selectedOrgId === org.id ? colors.bg : 'transparent',
+                      borderColor: selectedOrgId === org.id ? colors.border : 'rgba(0, 0, 0, 0.23)',
+                      border: '1px solid',
+                      fontWeight: selectedOrgId === org.id ? 'bold' : 'normal',
+                      '&:hover': {
+                        backgroundColor: colors.bg
+                      }
+                    }}
+                  />
+                );
+              })}
+            </Box>
+            {selectedOrgId && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Showing {filteredTickets.length} ticket(s) for {organizations.find(o => o.id === selectedOrgId)?.name}
+              </Typography>
+            )}
           </Box>
 
           <TableContainer component={Paper}>
@@ -371,14 +610,14 @@ const VendorDetail = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {vendorTickets.length === 0 ? (
+                {filteredTickets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} align="center">
                       No tickets are currently assigned to this vendor
                     </TableCell>
                   </TableRow>
                 ) : (
-                  vendorTickets.map((ticket) => {
+                  filteredTickets.map((ticket) => {
                     const org = organizations.find(o => o.id === ticket.orgId);
                     const location = org?.locations?.find(l => l.id === ticket.locationId);
                     
@@ -399,7 +638,17 @@ const VendorDetail = () => {
                           </Box>
                         </TableCell>
                         <TableCell>{ticket.title}</TableCell>
-                        <TableCell>{org?.name || 'Unknown'}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={org?.name || 'Unknown'} 
+                            size="small"
+                            sx={{
+                              backgroundColor: getOrgColor(ticket.orgId).bg,
+                              border: '1px solid',
+                              borderColor: getOrgColor(ticket.orgId).border
+                            }}
+                          />
+                        </TableCell>
                         <TableCell>{location?.name || 'Unknown'}</TableCell>
                         <TableCell>
                           <Chip 
@@ -571,6 +820,104 @@ const VendorDetail = () => {
           <Button onClick={handleTechnicianSubmit} variant="contained">
             Add
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Password Reset Dialog */}
+      <Dialog
+        open={passwordResetDialog}
+        onClose={() => setPasswordResetDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Reset Password for {selectedTechnician?.name}</DialogTitle>
+        <DialogContent>
+          {passwordResetError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {passwordResetError}
+            </Alert>
+          )}
+
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter a new password for this technician. They will need to use this password for their next login.
+          </Typography>
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="password"
+            label="New Password"
+            name="password"
+            type="password"
+            value={passwordResetForm.password}
+            onChange={handlePasswordResetChange}
+            helperText="Must be at least 8 characters with at least one letter and number"
+          />
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="confirmPassword"
+            label="Confirm New Password"
+            name="confirmPassword"
+            type="password"
+            value={passwordResetForm.confirmPassword}
+            onChange={handlePasswordResetChange}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPasswordResetDialog(false)}>Cancel</Button>
+          <Button onClick={handlePasswordResetSubmit} variant="contained" color="primary">
+            Reset Password
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Organization Context Dialog */}
+      <Dialog
+        open={orgContextDialog}
+        onClose={() => setOrgContextDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Organization Context for {selectedTechnician?.name}</DialogTitle>
+        <DialogContent>
+          {availableOrgs.length === 0 ? (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              This technician already has access to all available organizations.
+            </Alert>
+          ) : (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2, mt: 1 }}>
+                Select organizations where this technician can access tickets and perform work:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {availableOrgs.map(org => {
+                  const colors = getOrgColor(org.id);
+                  return (
+                    <Chip
+                      key={org.id}
+                      label={org.name}
+                      onClick={() => handleAddOrgContext(selectedTechnician?.id, org.id)}
+                      sx={{
+                        cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: colors.border,
+                        '&:hover': {
+                          backgroundColor: colors.bg
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOrgContextDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
