@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -33,7 +33,11 @@ import {
   ArrowBack as ArrowBackIcon,
   Add as AddIcon,
   AssignmentLate as TicketIcon,
-  Engineering as TechnicianIcon
+  Engineering as TechnicianIcon,
+  ThumbUp as AcceptIcon,
+  ThumbDown as RejectIcon,
+  HelpOutline as RequestInfoIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 
@@ -70,7 +74,11 @@ const VendorOrganizationDetail = () => {
     addTechnician,
     isEmailUnique,
     isPhoneUnique,
-    isPasswordStrong
+    isPasswordStrong,
+    acceptTicketByVendor,
+    rejectTicketByVendor,
+    requestMoreInfoByVendor,
+    getVendor
   } = useData();
 
   // State
@@ -84,9 +92,61 @@ const VendorOrganizationDetail = () => {
     confirmPassword: ''
   });
   const [formErrors, setFormErrors] = useState({});
+  const [responseType, setResponseType] = useState('');
+  const [responseDialog, setResponseDialog] = useState(false);
+  const [responseNote, setResponseNote] = useState('');
+  const [selectedTicketId, setSelectedTicketId] = useState('');
+  const [tickets, setTickets] = useState([]);
+  const [organization, setOrganization] = useState(null);
+  const [vendor, setVendor] = useState(null);
+  const [orgLocations, setOrgLocations] = useState([]);
+  const [orgTechnicians, setOrgTechnicians] = useState([]);
 
-  // Get organization data
-  const organization = getOrganization(orgId);
+  // Fetch tickets function
+  const fetchVendorTickets = useCallback(() => {
+    const allTickets = getTickets();
+    // Filter tickets for this organization that are assigned to this vendor
+    if (vendor) {
+      const vendorTickets = allTickets.filter(ticket => {
+        const location = getLocations().find(loc => loc.id === ticket.locationId);
+        return location && location.orgId === orgId && ticket.vendorId === vendor.id;
+      });
+      setTickets(vendorTickets);
+    } else {
+      setTickets([]);
+    }
+  }, [orgId, vendor, getTickets, getLocations]);
+  
+  // Fetch data when component mounts or dependencies change
+  useEffect(() => {
+    // Get organization data
+    const org = getOrganization(orgId);
+    setOrganization(org);
+    
+    // Get vendor data
+    const foundVendor = getVendors().find(v => v.orgIds && v.orgIds.includes(orgId));
+    setVendor(foundVendor);
+    
+    // Get locations
+    const locations = getLocations(orgId);
+    setOrgLocations(locations);
+    
+    // Get technicians
+    const allTechs = getTechnicians(foundVendor ? foundVendor.id : null);
+    const techsForOrg = allTechs.filter(tech => 
+      tech.orgContextIds && tech.orgContextIds.includes(orgId)
+    );
+    setOrgTechnicians(techsForOrg);
+    
+    // This will run after vendor state is updated in the next render
+  }, [orgId, getVendors, getOrganization, getTechnicians, getLocations]);
+  
+  // Effect for fetching tickets
+  useEffect(() => {
+    fetchVendorTickets();
+  }, [fetchVendorTickets]);
+  
+  // Handle organization not found
   if (!organization) {
     return (
       <Box sx={{ p: 3 }}>
@@ -102,28 +162,67 @@ const VendorOrganizationDetail = () => {
     );
   }
 
-  // Get vendor data (in a real app, would be from current user's vendor)
-  const vendor = getVendors()[0]; // For demo, just use first vendor
-  
-  // Get related data
-  const orgLocations = getLocations(orgId);
-  
-  // Get tickets for this organization
-  const allTickets = getTickets();
-  const orgTickets = allTickets.filter(ticket => {
-    const location = getLocations().find(loc => loc.id === ticket.locationId);
-    return location && location.orgId === orgId;
-  });
-  
-  // Get technicians who are assigned to this organization
-  const allTechnicians = getTechnicians(vendor ? vendor.id : null);
-  const orgTechnicians = allTechnicians.filter(tech => 
-    tech.orgContextIds && tech.orgContextIds.includes(orgId)
-  );
-
   // Handle tab change
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+  };
+  
+  // Open response dialog
+  const handleOpenResponseDialog = (ticketId, type) => {
+    setSelectedTicketId(ticketId);
+    setResponseType(type);
+    setResponseNote('');
+    setResponseDialog(true);
+  };
+  
+  // Close response dialog
+  const handleCloseResponseDialog = () => {
+    setResponseDialog(false);
+    setSelectedTicketId('');
+    setResponseType('');
+    setResponseNote('');
+  };
+  
+  // Submit ticket response
+  const handleResponseSubmit = () => {
+    if (!selectedTicketId || !responseType) return;
+    
+    let success = false;
+    
+    switch (responseType) {
+      case 'accept':
+        success = acceptTicketByVendor(selectedTicketId, responseNote);
+        break;
+      case 'reject':
+        success = rejectTicketByVendor(selectedTicketId, responseNote);
+        break;
+      case 'moreInfo':
+        success = requestMoreInfoByVendor(selectedTicketId, responseNote);
+        break;
+      default:
+        break;
+    }
+    
+    if (success) {
+      // Refresh tickets list
+      fetchVendorTickets();
+      handleCloseResponseDialog();
+    }
+  };
+  
+  // Get status color based on ticket status
+  const getStatusColor = (status) => {
+    const statusMap = {
+      'New': 'error',
+      'Assigned': 'warning',
+      'In Progress': 'info',
+      'Paused': 'default',
+      'Completed': 'success',
+      'Verified': 'secondary',
+      'Rejected': 'error',
+      'More Info Needed': 'info'
+    };
+    return statusMap[status] || 'default';
   };
 
   // Handle technician form change
@@ -296,14 +395,14 @@ const VendorOrganizationDetail = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {orgTickets.length === 0 ? (
+                {tickets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} align="center">
                       No tickets found for this organization
                     </TableCell>
                   </TableRow>
                 ) : (
-                  orgTickets.map((ticket) => (
+                  tickets.map((ticket) => (
                     <TableRow
                       key={ticket.id}
                       hover
@@ -399,7 +498,7 @@ const VendorOrganizationDetail = () => {
                 ) : (
                   orgTechnicians.map((tech) => {
                     // Count active tickets for this technician
-                    const activeTickets = orgTickets.filter(
+                    const activeTickets = tickets.filter(
                       t => t.assignedTechnicianId === tech.id && 
                       ['Assigned', 'In Progress', 'Paused'].includes(t.status)
                     ).length;
@@ -528,6 +627,56 @@ const VendorOrganizationDetail = () => {
           <Button onClick={() => setTechnicianDialog(false)}>Cancel</Button>
           <Button onClick={handleTechnicianSubmit} variant="contained">
             Add Technician
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Ticket Response Dialog */}
+      <Dialog 
+        open={responseDialog} 
+        onClose={handleCloseResponseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>
+            {responseType === 'accept' && 'Accept Ticket'}
+            {responseType === 'reject' && 'Reject Ticket'}
+            {responseType === 'moreInfo' && 'Request More Information'}
+          </span>
+          <IconButton onClick={handleCloseResponseDialog} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            {responseType === 'accept' && 'You are accepting this ticket. Add optional notes below:'}
+            {responseType === 'reject' && 'Please provide a reason for rejecting this ticket:'}
+            {responseType === 'moreInfo' && 'Please specify what additional information you need:'}
+          </Typography>
+          
+          <TextField
+            autoFocus
+            margin="dense"
+            id="responseNote"
+            label={responseType === 'accept' ? 'Notes (Optional)' : 'Reason (Required)'}
+            fullWidth
+            multiline
+            rows={4}
+            value={responseNote}
+            onChange={(e) => setResponseNote(e.target.value)}
+            required={responseType !== 'accept'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseResponseDialog}>Cancel</Button>
+          <Button 
+            onClick={handleResponseSubmit} 
+            variant="contained"
+            color={responseType === 'accept' ? 'success' : responseType === 'reject' ? 'error' : 'primary'}
+            disabled={(responseType !== 'accept' && !responseNote)}
+          >
+            Submit
           </Button>
         </DialogActions>
       </Dialog>

@@ -48,6 +48,7 @@ import {
   Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
+import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../context/AuthContext';
 import { useParams } from 'react-router-dom';
 
@@ -68,7 +69,9 @@ const STATUS_COLORS = {
   'In Progress': 'info',
   'Paused': 'default',
   'Completed': 'success',
-  'Verified': 'secondary'
+  'Verified': 'secondary',
+  'Rejected': 'error',
+  'More Info Needed': 'info'
 };
 
 // Ticket workflow stages
@@ -76,6 +79,10 @@ const TICKET_WORKFLOW = [
   { key: 'created', label: 'Ticket Placed', description: 'Maintenance request submitted', status: 'New' },
   { key: 'pending_approval', label: 'Pending Approval', description: 'Waiting for approval from admin', status: 'New' },
   { key: 'assigned', label: 'Vendor Assigned', description: 'Ticket assigned to vendor', status: 'Assigned' },
+  { key: 'waiting_vendor_response', label: 'Awaiting Vendor Response', description: 'Waiting for vendor to accept, reject, or request more info', status: 'Assigned' },
+  { key: 'vendor_accepted', label: 'Vendor Accepted', description: 'Vendor accepted the ticket', status: 'Assigned' },
+  { key: 'vendor_rejected', label: 'Vendor Rejected', description: 'Vendor rejected the ticket', status: 'Rejected' },
+  { key: 'more_info_requested', label: 'More Info Requested', description: 'Vendor requested more information', status: 'More Info Needed' },
   { key: 'work_order', label: 'Work Order Created', description: 'Vendor created work order', status: 'Assigned' },
   { key: 'in_progress', label: 'Work In Progress', description: 'Vendor is working on the issue', status: 'In Progress' },
   { key: 'invoice_uploaded', label: 'Invoice Uploaded', description: 'Work completed and invoice uploaded', status: 'Completed' },
@@ -100,7 +107,8 @@ const Tickets = () => {
     hasTicketTierAccess,
     shouldEscalateToTier1B,
     systemConfig,
-    getAccessibleLocations
+    getAccessibleLocations,
+    provideMoreInfo
   } = useData();
 
   // States
@@ -111,6 +119,8 @@ const Tickets = () => {
   const [actionType, setActionType] = useState(null);
   const [actionNote, setActionNote] = useState('');
   const [selectedVendor, setSelectedVendor] = useState('');
+  const [moreInfoDialogOpen, setMoreInfoDialogOpen] = useState(false);
+  const [additionalInfo, setAdditionalInfo] = useState('');
   
   // Generate a temporary ticket number for preview
   const generateTempTicketNo = () => {
@@ -447,34 +457,45 @@ const Tickets = () => {
   
   // Determine the current step in the workflow
   const determineCurrentStep = (ticket) => {
-    if (!ticket) return 0; // Default to first step
+    if (!ticket) return 'created';
     
-    // Early completion logic
-    if (ticket.status === 'Verified') {
-      return TICKET_WORKFLOW.length - 1; // Last step (completed)
+    // If the ticket has a currentStep field, use that directly
+    if (ticket.currentStep && TICKET_WORKFLOW.some(step => step.key === ticket.currentStep)) {
+      return ticket.currentStep;
     }
     
-    // Determine progress based on status and other fields
-    switch (ticket.status) {
+    // Otherwise fallback to status-based determination
+    switch(ticket.status) {
       case 'New':
-        return ticket.adminApproved ? 1 : 0; // Either "Ticket Placed" or "Pending Approval"
-        
+        return 'created';
       case 'Assigned':
-        return ticket.workOrderCreated ? 3 : 2; // Either "Vendor Assigned" or "Work Order Created"
-        
+        // Check for vendor response steps
+        if (ticket.workOrders?.some(wo => wo.type === 'vendor_accepted')) {
+          return 'vendor_accepted';
+        }
+        // If work has been started, check if we have work orders
+        if (ticket.workOrders?.some(wo => wo.type === 'work_started')) {
+          return 'work_order';
+        }
+        return 'waiting_vendor_response';
+      case 'Rejected':
+        return 'vendor_rejected';
+      case 'More Info Needed':
+        return 'more_info_requested';
       case 'In Progress':
-        return 4; // "Work In Progress"
-        
+        return 'in_progress';
       case 'Completed':
-        return ticket.invoiceUploaded ? 
-          (ticket.finalApprovalRequested ? 6 : 5) : // "Invoice Uploaded" or "Awaiting Approval"
-          5; // Default to "Invoice Uploaded" if we don't have explicit flags
-        
-      case 'Paused':
-        return 4; // Consider "Paused" as still in the "Work In Progress" step
-        
+        if (ticket.workOrders?.some(wo => wo.type === 'invoice_uploaded')) {
+          return 'invoice_uploaded';
+        }
+        if (ticket.workOrders?.some(wo => wo.type === 'work_completed' || wo.type === 'approval_requested')) {
+          return 'awaiting_approval';
+        }
+        return 'in_progress';
+      case 'Verified':
+        return 'completed';
       default:
-        return 0;
+        return 'created';
     }
   };
 
@@ -485,51 +506,83 @@ const Tickets = () => {
     setSelectedVendor('');
     setActionDialogOpen(true);
   };
-
+  
   // Handle action dialog close
   const handleCloseActionDialog = () => {
     setActionDialogOpen(false);
     setActionType(null);
   };
-
+  
   // Handle action submission
-  const handleActionSubmit = async () => {
+  const handleActionSubmit = () => {
     if (!selectedTicket) return;
     
     try {
       switch (actionType) {
         case 'assign':
-          await assignTicket(selectedTicket.id, selectedVendor);
+          assignTicket(selectedTicket.id, selectedVendor);
           break;
         case 'start':
-          await startWork(selectedTicket.id);
+          startWork(selectedTicket.id);
           break;
         case 'pause':
-          await pauseWork(selectedTicket.id, actionNote);
+          pauseWork(selectedTicket.id, actionNote);
           break;
         case 'complete':
-          await completeWork(selectedTicket.id, actionNote);
+          completeWork(selectedTicket.id, actionNote);
           break;
         case 'verify':
-          await verifyCompletion(selectedTicket.id);
+          verifyCompletion(selectedTicket.id);
           break;
         default:
           break;
       }
       
       // Refresh tickets data after action
-      const newTickets = await getTickets();
-      setTickets(newTickets || []);
+      const updatedTickets = getTickets();
+      setFilteredTickets(updatedTickets.filter(ticket => applyFilters([ticket]).length > 0));
       
       // Get updated ticket info
-      const updatedTicket = await getTicket(selectedTicket.id);
+      const updatedTicket = getTicket(selectedTicket.id);
       setSelectedTicket(updatedTicket);
       
       handleCloseActionDialog();
     } catch (error) {
       console.error(`Error processing ${actionType} action:`, error);
-      alert(`Error: ${error.message}`);
+      alert(`Error: ${error.message || 'An error occurred'}`);
       handleCloseActionDialog();
+    }
+  };
+  
+  // Open more info dialog
+  const handleMoreInfoClick = () => {
+    setAdditionalInfo('');
+    setMoreInfoDialogOpen(true);
+  };
+  
+  // Close more info dialog
+  const handleCloseMoreInfoDialog = () => {
+    setMoreInfoDialogOpen(false);
+    setAdditionalInfo('');
+  };
+  
+  // Submit additional info
+  const handleMoreInfoSubmit = () => {
+    if (!selectedTicket || !additionalInfo.trim()) return;
+    
+    const success = provideMoreInfo(selectedTicket.id, additionalInfo);
+    
+    if (success) {
+      // Refresh tickets
+      // We use the existing fetchData method from earlier in the component
+      const updatedTickets = getTickets();
+      setFilteredTickets(applyFilters(updatedTickets));
+      
+      // Close dialog
+      setMoreInfoDialogOpen(false);
+      // Close drawer
+      setDrawerOpen(false);
+      setSelectedTicket(null);
     }
   };
 
@@ -537,102 +590,122 @@ const Tickets = () => {
   const renderActionButtons = (ticket) => {
     if (!ticket) return null;
     
-    const currentStepInfo = determineCurrentStep(ticket) || {};
-    const isAssigned = ticket.assignedVendorId;
-    const isInProgress = ticket.status === 'In Progress';
-    const isPaused = ticket.status === 'Paused';
-    const isCompleted = ticket.status === 'Completed';
+    const currentStep = determineCurrentStep(ticket);
     
-    // Determine if the current user has tier access for this ticket
-    const ticketTier = ticket.tier || 1;
-    const tierType = ticket.tierType || (ticketTier === 1 ? '1A' : String(ticketTier));
-    
-    // Check if the ticket should be escalated from Tier 1A to 1B
-    const isEscalated = ticketTier === 1 && shouldEscalateToTier1B(ticket);
-    
-    // For sub-admins, check tier access permissions with the full ticket for time-based checks
-    const hasTierAccess = user.role === 'subadmin' 
-      ? hasTicketTierAccess(user.id, ticket.locationId, tierType || ticketTier, ticket)
-      : true; // Root users and others have full access
-    
-    return (
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        {/* Assign Button - Only show if user has tier access */}
-        {!isAssigned && ticket.status === 'New' && hasTierAccess && (
-          <Tooltip title="Assign to Vendor">
-            <IconButton 
-              color="primary" 
+    // Buttons for each workflow stage
+    switch (currentStep) {
+      case 'created':
+        // New ticket - need tier 1 access to accept and assign
+        if (hasTicketTierAccess('1', ticket.locationId)) {
+          return (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AssignIcon />}
               onClick={() => handleActionClick('assign')}
-              size="small"
             >
-              <AssignIcon />
-            </IconButton>
-          </Tooltip>
-        )}
+              Assign to Vendor
+            </Button>
+          );
+        }
+        return null;
+      
+      case 'more_info_requested':
+        // Vendor requested more information - ticket creator or assignee can respond
+        if (ticket.createdBy === user.id || 
+            (user.role === 'subadmin' && hasTicketTierAccess('1', ticket.locationId))) {
+          return (
+            <Button
+              variant="contained"
+              color="info"
+              onClick={handleMoreInfoClick}
+            >
+              Provide More Information
+            </Button>
+          );
+        }
+        return null;
         
-        {/* Start Work Button */}
-        {isAssigned && !isInProgress && !isCompleted && !isPaused && hasTierAccess && (
-          <Tooltip title="Start Work">
-            <IconButton 
-              color="primary" 
+      case 'vendor_rejected':
+        // Vendor rejected the ticket - need tier 1 access to reassign
+        if (hasTicketTierAccess('1', ticket.locationId)) {
+          return (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AssignIcon />}
+              onClick={() => handleActionClick('assign')}
+            >
+              Reassign to Another Vendor
+            </Button>
+          );
+        }
+        return null;
+        
+      case 'waiting_vendor_response':
+      case 'vendor_accepted':
+      case 'assigned':
+        if (user.role === 'vendor' && ticket.vendorId === user.vendorId) {
+          // Vendor assigned to this ticket
+          return (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<StartIcon />}
               onClick={() => handleActionClick('start')}
-              size="small"
             >
-              <StartIcon />
-            </IconButton>
-          </Tooltip>
-        )}
+              Start Work
+            </Button>
+          );
+        }
+        return null;
         
-        {/* Pause Work Button */}
-        {isInProgress && hasTierAccess && (
-          <Tooltip title="Pause Work">
-            <IconButton 
-              color="warning" 
-              onClick={() => handleActionClick('pause')}
-              size="small"
-            >
-              <PauseIcon />
-            </IconButton>
-          </Tooltip>
-        )}
+      case 'in_progress':
+        if (user.role === 'vendor' && ticket.vendorId === user.vendorId) {
+          // Vendor working on this ticket
+          return (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                color="warning"
+                startIcon={<PauseIcon />}
+                onClick={() => handleActionClick('pause')}
+              >
+                Pause Work
+              </Button>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<CompleteIcon />}
+                onClick={() => handleActionClick('complete')}
+              >
+                Complete
+              </Button>
+            </Box>
+          );
+        }
+        return null;
         
-        {/* Complete Work Button */}
-        {(isInProgress || isPaused) && hasTierAccess && (
-          <Tooltip title="Mark Completed">
-            <IconButton 
-              color="success" 
-              onClick={() => handleActionClick('complete')}
-              size="small"
-            >
-              <CompleteIcon />
-            </IconButton>
-          </Tooltip>
-        )}
-        
-        {/* Verify Button */}
-        {isCompleted && hasTierAccess && (
-          <Tooltip title="Verify Completion">
-            <IconButton 
-              color="secondary" 
+      case 'awaiting_approval':
+        if ((user.role === 'subadmin' && user.permissions?.includes('subadmin.verifyJobCompleted')) ||
+            user.role === 'root') {
+          // Admin/subadmin with verification permission
+          return (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<VerifyIcon />}
               onClick={() => handleActionClick('verify')}
-              size="small"
             >
-              <VerifyIcon />
-            </IconButton>
-          </Tooltip>
-        )}
+              Verify Completion
+            </Button>
+          );
+        }
+        return null;
         
-        {/* View Button - Always Available */}
-        <Tooltip title="View Details">
-          <IconButton 
-            onClick={() => handleViewTicket(ticket.id)}
-            size="small"
-          >
-            <VisibilityIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
-    );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -1315,6 +1388,48 @@ const Tickets = () => {
             }
           >
             Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* More Info Dialog */}
+      <Dialog 
+        open={moreInfoDialogOpen} 
+        onClose={handleCloseMoreInfoDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Provide Additional Information</DialogTitle>
+        <DialogContent>
+          {selectedTicket && selectedTicket.workOrders && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {selectedTicket.workOrders
+                .filter(wo => wo.type === 'more_info_requested')
+                .slice(-1)[0]?.note || 'Vendor has requested more information.'}
+            </Alert>
+          )}
+          
+          <TextField
+            autoFocus
+            margin="normal"
+            required
+            fullWidth
+            id="additionalInfo"
+            label="Additional Information"
+            multiline
+            rows={4}
+            value={additionalInfo}
+            onChange={(e) => setAdditionalInfo(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseMoreInfoDialog}>Cancel</Button>
+          <Button 
+            onClick={handleMoreInfoSubmit} 
+            variant="contained"
+            disabled={!additionalInfo.trim()}
+          >
+            Submit
           </Button>
         </DialogActions>
       </Dialog>

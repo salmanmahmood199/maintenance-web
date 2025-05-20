@@ -128,6 +128,33 @@ const initialData = {
   ]
 };
 
+// Status colors
+const STATUS_COLORS = {
+  'New': 'error',
+  'Assigned': 'warning',
+  'In Progress': 'info',
+  'Paused': 'default',
+  'Completed': 'success',
+  'Verified': 'secondary',
+  'Rejected': 'error',
+  'More Info Needed': 'info'
+};
+
+const TICKET_WORKFLOW = [
+  { key: 'created', label: 'Ticket Placed', description: 'Maintenance request submitted', status: 'New' },
+  { key: 'pending_approval', label: 'Pending Approval', description: 'Waiting for approval from admin', status: 'New' },
+  { key: 'assigned', label: 'Vendor Assigned', description: 'Ticket assigned to vendor', status: 'Assigned' },
+  { key: 'waiting_vendor_response', label: 'Awaiting Vendor Response', description: 'Waiting for vendor to accept, reject, or request more info', status: 'Assigned' },
+  { key: 'vendor_accepted', label: 'Vendor Accepted', description: 'Vendor accepted the ticket', status: 'Assigned' },
+  { key: 'vendor_rejected', label: 'Vendor Rejected', description: 'Vendor rejected the ticket', status: 'Rejected' },
+  { key: 'more_info_requested', label: 'More Info Requested', description: 'Vendor requested more information', status: 'More Info Needed' },
+  { key: 'work_order', label: 'Work Order Created', description: 'Vendor created work order', status: 'Assigned' },
+  { key: 'in_progress', label: 'Work In Progress', description: 'Vendor is working on the issue', status: 'In Progress' },
+  { key: 'invoice_uploaded', label: 'Invoice Uploaded', description: 'Work completed and invoice uploaded', status: 'Completed' },
+  { key: 'awaiting_approval', label: 'Awaiting Approval', description: 'Waiting for final approval', status: 'Completed' },
+  { key: 'completed', label: 'Order Complete', description: 'All work verified and completed', status: 'Verified' }
+];
+
 // Data provider component
 export const DataProvider = ({ children }) => {
   const [data, setData] = useState(() => {
@@ -633,25 +660,127 @@ export const DataProvider = ({ children }) => {
   // Assign a ticket to a vendor
   const assignTicket = (id, vendorId) => {
     const ticket = getTicket(id);
-    if (!ticket) throw new Error('Ticket not found');
+    if (!ticket) return false;
     
-    const vendor = getVendor(vendorId);
-    if (!vendor) throw new Error('Vendor not found');
+    // Update ticket with vendor assignment
+    updateTicket(id, {
+      ...ticket,
+      vendorId,
+      status: 'Assigned',
+      currentStep: 'waiting_vendor_response',
+      workOrders: [
+        ...(ticket.workOrders || []),
+        {
+          type: 'assigned',
+          timestamp: new Date().toISOString(),
+          note: `Ticket assigned to vendor`,
+          vendorId
+        }
+      ],
+      updatedAt: new Date().toISOString()
+    });
     
+    return true;
+  };
+  
+  // Handle vendor accepting a ticket
+  const acceptTicketByVendor = (id, note = '') => {
+    // Get ticket
+    const ticket = getTicket(id);
+    if (!ticket) return false;
+    
+    // Update ticket with vendor acceptance
     updateTicket(id, {
       ...ticket,
       status: 'Assigned',
-      vendorId,
-      assignedAt: new Date().toISOString(),
-      history: [
-        ...(ticket.history || []),
+      currentStep: 'vendor_accepted',
+      workOrders: [
+        ...(ticket.workOrders || []),
         {
-          action: 'assigned',
+          type: 'vendor_accepted',
           timestamp: new Date().toISOString(),
-          vendorId
+          note: note || 'Vendor accepted the ticket'
         }
-      ]
+      ],
+      updatedAt: new Date().toISOString()
     });
+    
+    return true;
+  };
+  
+  // Handle vendor rejecting a ticket
+  const rejectTicketByVendor = (id, reason) => {
+    // Get ticket
+    const ticket = getTicket(id);
+    if (!ticket) return false;
+    
+    // Update ticket with vendor rejection
+    updateTicket(id, {
+      ...ticket,
+      status: 'Rejected',
+      currentStep: 'vendor_rejected',
+      workOrders: [
+        ...(ticket.workOrders || []),
+        {
+          type: 'vendor_rejected',
+          timestamp: new Date().toISOString(),
+          note: `Vendor rejected the ticket: ${reason}`
+        }
+      ],
+      updatedAt: new Date().toISOString()
+    });
+    
+    return true;
+  };
+  
+  // Handle vendor requesting more information
+  const requestMoreInfoByVendor = (id, infoNeeded) => {
+    // Get ticket
+    const ticket = getTicket(id);
+    if (!ticket) return false;
+    
+    // Update ticket with info request
+    updateTicket(id, {
+      ...ticket,
+      status: 'More Info Needed',
+      currentStep: 'more_info_requested',
+      workOrders: [
+        ...(ticket.workOrders || []),
+        {
+          type: 'more_info_requested',
+          timestamp: new Date().toISOString(),
+          note: `Vendor requested more information: ${infoNeeded}`
+        }
+      ],
+      updatedAt: new Date().toISOString()
+    });
+    
+    return true;
+  };
+  
+  // Handle providing more information to a ticket
+  const provideMoreInfo = (id, additionalInfo) => {
+    // Get ticket
+    const ticket = getTicket(id);
+    if (!ticket) return false;
+    
+    // Update ticket with additional info
+    updateTicket(id, {
+      ...ticket,
+      status: 'Assigned',
+      currentStep: 'waiting_vendor_response',
+      workOrders: [
+        ...(ticket.workOrders || []),
+        {
+          type: 'more_info_provided',
+          timestamp: new Date().toISOString(),
+          note: `Additional information provided: ${additionalInfo}`
+        }
+      ],
+      updatedAt: new Date().toISOString()
+    });
+    
+    return true;
   };
   
   // Create work order
@@ -1078,6 +1207,10 @@ export const DataProvider = ({ children }) => {
     // Ticket Workflow
     approveTicket,
     assignTicket,
+    acceptTicketByVendor,
+    rejectTicketByVendor,
+    requestMoreInfoByVendor,
+    provideMoreInfo,
     createWorkOrder,
     startWork,
     pauseWork,
