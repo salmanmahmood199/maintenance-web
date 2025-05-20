@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -9,6 +9,9 @@ import theme from './theme';
 // Context Providers
 import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
+
+// Data Sync Utilities
+import { setupAutoSync, setupUnloadSync, addSyncButton } from './utils/syncToServer';
 
 // Components
 import Layout from './components/Layout';
@@ -30,6 +33,26 @@ import Locations from './pages/Locations';
 import Tickets from './pages/Tickets';
 
 function App() {
+  // Set up data synchronization between localStorage and JSON server
+  useEffect(() => {
+    // Set up auto sync every 5 minutes
+    const cleanupAutoSync = setupAutoSync(300000);
+    
+    // Set up sync on page unload
+    const cleanupUnloadSync = setupUnloadSync();
+    
+    // Add sync button to the UI after component mount
+    setTimeout(() => {
+      addSyncButton('root');
+    }, 1000);
+    
+    // Cleanup function
+    return () => {
+      cleanupAutoSync();
+      cleanupUnloadSync();
+    };
+  }, []);
+  
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
