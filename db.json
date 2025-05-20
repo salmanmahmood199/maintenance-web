@@ -37,7 +37,63 @@
       "contactEmail": "smahmood@nsrpetro.com",
       "contactPhone": "2404635262",
       "plan": "basic",
-      "subAdmins": [],
+      "subAdmins": [
+        {
+          "id": "sa1747191642758",
+          "name": "sadnkla",
+          "email": "smahmood@nsrpetro.com",
+          "phone": "2404609231",
+          "password": "admin",
+          "role": "subadmin",
+          "organizationId": "4741",
+          "permissions": [
+            "subadmin.verifyJobCompleted"
+          ]
+        },
+        {
+          "id": "sa1747195575523",
+          "name": "test",
+          "email": "test@mail.com",
+          "phone": "6671149112",
+          "password": "admin",
+          "role": "subadmin",
+          "organizationId": "4741",
+          "permissions": [
+            "subadmin.tier2AcceptTicket",
+            "subadmin.acceptTicket",
+            "subadmin.addIssueType",
+            "subadmin.assignLocation"
+          ],
+          "assignedLocationIds": []
+        },
+        {
+          "id": "sa1747277041202",
+          "name": "nsr manager",
+          "email": "nsrmanager@nsrpetro.com",
+          "phone": "2020000000",
+          "password": "admin",
+          "role": "subadmin",
+          "organizationId": "4741",
+          "permissions": [
+            "subadmin.placeTicket",
+            "subadmin.verifyJobCompleted"
+          ],
+          "assignedLocationIds": []
+        },
+        {
+          "id": "sa1747277060964",
+          "name": "nsr office",
+          "email": "nsroffice@nsrpetro.com",
+          "phone": "2029990000",
+          "password": "admin",
+          "role": "subadmin",
+          "organizationId": "4741",
+          "permissions": [
+            "subadmin.acceptTicket"
+          ],
+          "assignedLocationIds": []
+        }
+      ],
       "createdAt": "2025-05-12T02:47:02.076Z",
       "updatedAt": "2025-05-12T03:35:23.675Z"
     }
@@ -106,15 +162,18 @@
     {
       "id": "v1747018926277",
       "name": "NSR Vendor",
-      "email": "vendor+1747018926277@nsrpetro.com",
+      "email": "vendor+1747277162713@nsrpetro.com",
       "phone": "2404635262",
-      "status": "inactive",
+      "status": "active",
       "tier": 1,
       "orgIds": [
-        "4741"
+        "4741",
+        "org-001"
       ],
       "createdAt": "2025-05-12T03:02:06.278Z",
-      "updatedAt": "2025-05-12T03:21:57.977Z"
+      "updatedAt": "2025-05-12T03:21:57.977Z",
+      "password": "admin",
+      "specialties": "HVAC"
     }
   ],
   "locations": [
@@ -137,6 +196,39 @@
       "status": "active",
       "createdAt": "2025-05-01T10:35:00.000Z",
       "updatedAt": "2025-05-01T10:35:00.000Z"
+    },
+    {
+      "name": "landover shell",
+      "address": "2318 halls grove rd",
+      "city": "gambrills",
+      "state": "MD",
+      "zip": "21054",
+      "country": "USA",
+      "phone": "2021992444",
+      "orgId": "4741",
+      "id": "0bc4358c-e7cf-4b0e-a108-420260c71292"
+    },
+    {
+      "name": "test location",
+      "address": "8555 MLK JR HWY, LANHAM MD",
+      "city": "Gambrills",
+      "state": "Maryland",
+      "zip": "21054",
+      "country": "United States",
+      "phone": "2404609232",
+      "orgId": "4741",
+      "id": "27f36685-324c-4888-bde7-f2b2dd7419e4"
+    },
+    {
+      "name": "leonardtown",
+      "address": "2318 Halls Grove Rd",
+      "city": "Gambrills",
+      "state": "Maryland",
+      "zip": "21054",
+      "country": "United States",
+      "phone": "2404609232",
+      "orgId": "4741",
+      "id": "3124d887-3a3e-4160-a79f-b3487c15f920"
     }
   ],
   "subAdmins": [
@@ -154,10 +246,302 @@
       ],
       "createdAt": "2025-05-12T03:35:23.630Z",
       "updatedAt": "2025-05-12T21:11:00.300Z"
+    },
+    {
+      "id": "sa1747021000001",
+      "name": "sadnkla",
+      "email": "smahmood@nsrpetro.com",
+      "phone": "2404609231",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.verifyJobCompleted"
+      ],
+      "assignedLocationIds": [
+        "landover-shell",
+        "test-location"
+      ],
+      "createdAt": "2025-05-13T09:15:00.000Z",
+      "updatedAt": "2025-05-13T09:15:00.000Z"
+    },
+    {
+      "id": "sa1747021000002",
+      "name": "test",
+      "email": "test@mail.com",
+      "phone": "6671149112",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.tier2AcceptTicket",
+        "subadmin.acceptTicket"
+      ],
+      "assignedLocationIds": [
+        "landover-shell",
+        "test-location"
+      ],
+      "createdAt": "2025-05-13T10:20:00.000Z",
+      "updatedAt": "2025-05-13T10:20:00.000Z"
+    },
+    {
+      "id": "sa1747021000003",
+      "name": "nsr manager",
+      "email": "nsrmanager@nsrpetro.com",
+      "phone": "2020000000",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.placeTicket",
+        "subadmin.verifyJobCompleted"
+      ],
+      "assignedLocationIds": [
+        "leonardtown",
+        "test-location"
+      ],
+      "createdAt": "2025-05-13T11:30:00.000Z",
+      "updatedAt": "2025-05-13T11:30:00.000Z"
+    },
+    {
+      "id": "sa1747021000004",
+      "name": "nsr office",
+      "email": "nsroffice@nsrpetro.com",
+      "phone": "2029990000",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.acceptTicket"
+      ],
+      "assignedLocationIds": [
+        "leonardtown"
+      ],
+      "createdAt": "2025-05-13T12:45:00.000Z",
+      "updatedAt": "2025-05-13T12:45:00.000Z"
+    },
+    {
+      "id": "sa1747191642758",
+      "name": "sadnkla",
+      "email": "smahmood@nsrpetro.com",
+      "phone": "2404609231",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.verifyJobCompleted"
+      ],
+      "assignedLocationIds": [
+        "0bc4358c-e7cf-4b0e-a108-420260c71292",
+        "27f36685-324c-4888-bde7-f2b2dd7419e4"
+      ]
+    },
+    {
+      "id": "sa1747195575523",
+      "name": "test",
+      "email": "test@mail.com",
+      "phone": "6671149112",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.tier2AcceptTicket",
+        "subadmin.acceptTicket",
+        "subadmin.addIssueType",
+        "subadmin.assignLocation"
+      ],
+      "assignedLocationIds": [
+        "0bc4358c-e7cf-4b0e-a108-420260c71292",
+        "27f36685-324c-4888-bde7-f2b2dd7419e4"
+      ],
+      "locationTierPermissions": {
+        "0bc4358c-e7cf-4b0e-a108-420260c71292": {
+          "acceptTicket": true,
+          "tiers": [
+            1,
+            2,
+            3
+          ]
+        },
+        "27f36685-324c-4888-bde7-f2b2dd7419e4": {
+          "acceptTicket": true,
+          "tiers": [
+            1,
+            "1A"
+          ]
+        }
+      }
+    },
+    {
+      "id": "sa1747277041202",
+      "name": "nsr manager",
+      "email": "nsrmanager@nsrpetro.com",
+      "phone": "2020000000",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.placeTicket",
+        "subadmin.verifyJobCompleted"
+      ],
+      "assignedLocationIds": [
+        "3124d887-3a3e-4160-a79f-b3487c15f920",
+        "27f36685-324c-4888-bde7-f2b2dd7419e4"
+      ],
+      "locationTierPermissions": {}
+    },
+    {
+      "id": "sa1747277060964",
+      "name": "nsr office",
+      "email": "nsroffice@nsrpetro.com",
+      "phone": "2029990000",
+      "password": "admin",
+      "role": "subadmin",
+      "organizationId": "4741",
+      "permissions": [
+        "subadmin.acceptTicket"
+      ],
+      "assignedLocationIds": [
+        "3124d887-3a3e-4160-a79f-b3487c15f920"
+      ],
+      "locationTierPermissions": {
+        "3124d887-3a3e-4160-a79f-b3487c15f920": {
+          "acceptTicket": true,
+          "tiers": [
+            "1A"
+          ]
+        }
+      }
     }
   ],
-  "tickets": [],
-  "technicians": [],
+  "tickets": [
+    {
+      "locationId": "0bc4358c-e7cf-4b0e-a108-420260c71292",
+      "issueType": "electrical",
+      "description": "test",
+      "placedBy": "root@mail.com",
+      "notes": "test notes",
+      "timestamp": "2025-05-14T03:42:37.772Z",
+      "priority": "critical",
+      "mediaUrls": [],
+      "status": "new",
+      "createdAt": "2025-05-14T03:42:37.773Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2025-05-14T03:42:37.773Z"
+        }
+      ],
+      "id": "14ca328e-8983-4512-a989-a36fca6a3a26"
+    },
+    {
+      "id": "tick1747195501432",
+      "ticketNo": "TICK-2299",
+      "locationId": "27f36685-324c-4888-bde7-f2b2dd7419e4",
+      "issueType": "plumbing",
+      "description": "test",
+      "placedBy": "root@mail.com",
+      "dateTime": "2025-05-14T04:05:01.432Z",
+      "status": "New",
+      "vendorId": null,
+      "notes": [
+        {
+          "text": "test notes",
+          "date": "2025-05-14T04:05:01.432Z",
+          "by": "root@mail.com"
+        }
+      ],
+      "mediaUrls": [
+        "https://example.com/uploads/1747195501432-0-Screenshot 2025-05-13 at 9.22.00 PM.png"
+      ],
+      "priority": "high",
+      "adminApproved": false,
+      "workOrderCreated": false,
+      "invoiceUploaded": false,
+      "finalApprovalRequested": false,
+      "completionDate": null,
+      "verificationDate": null,
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2025-05-14T04:05:01.432Z",
+          "by": "root@mail.com"
+        }
+      ]
+    },
+    {
+      "id": "tick1747277286274",
+      "ticketNo": "TICK-5056",
+      "locationId": "3124d887-3a3e-4160-a79f-b3487c15f920",
+      "issueType": "electrical",
+      "description": "lights are not working",
+      "placedBy": "nsrmanager@nsrpetro.com",
+      "dateTime": "2025-05-15T02:48:06.274Z",
+      "status": "New",
+      "vendorId": null,
+      "notes": [],
+      "mediaUrls": [],
+      "priority": "medium",
+      "adminApproved": false,
+      "workOrderCreated": false,
+      "invoiceUploaded": false,
+      "finalApprovalRequested": false,
+      "completionDate": null,
+      "verificationDate": null,
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2025-05-15T02:48:06.274Z",
+          "by": "nsrmanager@nsrpetro.com"
+        }
+      ]
+    },
+    {
+      "id": "tick1747278767597",
+      "ticketNo": "TICK-392",
+      "locationId": "3124d887-3a3e-4160-a79f-b3487c15f920",
+      "issueType": "electrical",
+      "description": "lights are out",
+      "placedBy": "nsrmanager@nsrpetro.com",
+      "dateTime": "2025-05-15T03:12:47.597Z",
+      "status": "New",
+      "vendorId": null,
+      "notes": [
+        {
+          "text": "none",
+          "date": "2025-05-15T03:12:47.597Z",
+          "by": "nsrmanager@nsrpetro.com"
+        }
+      ],
+      "mediaUrls": [],
+      "priority": "medium",
+      "adminApproved": false,
+      "workOrderCreated": false,
+      "invoiceUploaded": false,
+      "finalApprovalRequested": false,
+      "completionDate": null,
+      "verificationDate": null,
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2025-05-15T03:12:47.597Z",
+          "by": "nsrmanager@nsrpetro.com"
+        }
+      ]
+    }
+  ],
+  "technicians": [
+    {
+      "id": "t1747267136601",
+      "name": "test technician",
+      "email": "technician@gmail.com",
+      "phone": "2022229222",
+      "vendorId": "v1747018926277",
+      "orgContextIds": [
+        "4741"
+      ]
+    }
+  ],
   "users": [
     {
       "id": "user-root",
@@ -173,12 +557,13 @@
     },
     {
       "id": "83734cc3-e38f-41f7-a3e5-1c7cff73767d",
-      "email": "vendor+1747018926277@nsrpetro.com",
+      "email": "vendor+1747277162713@nsrpetro.com",
       "phone": "2404635262",
-      "password": "Thejumpingcastle123!",
+      "password": "admin",
       "role": "vendor",
       "orgContextIds": [
-        "4741"
+        "4741",
+        "org-001"
       ],
       "vendorId": "v1747018926277",
       "createdAt": "2025-05-12T03:02:06.277Z",
@@ -211,6 +596,73 @@
       ],
       "permissions": [
         "subadmin.placeTicket"
+      ]
+    },
+    {
+      "id": "e9287522-9287-4812-829f-23a275b6ea45",
+      "email": "smahmood@nsrpetro.com",
+      "phone": "2404609231",
+      "password": "admin",
+      "role": "subadmin",
+      "orgContextIds": [
+        "4741"
+      ],
+      "permissions": [
+        "subadmin.verifyJobCompleted"
+      ]
+    },
+    {
+      "id": "a11cf84b-1ed3-42ab-b51f-464f1fbae566",
+      "email": "test@mail.com",
+      "phone": "6671149112",
+      "password": "admin",
+      "role": "subadmin",
+      "orgContextIds": [
+        "4741"
+      ],
+      "permissions": [
+        "subadmin.tier2AcceptTicket",
+        "subadmin.acceptTicket",
+        "subadmin.addIssueType",
+        "subadmin.assignLocation"
+      ]
+    },
+    {
+      "id": "ef1dcaa0-0dff-4ea8-9318-e43196712bb3",
+      "email": "technician@gmail.com",
+      "phone": "2022229222",
+      "password": "admin",
+      "role": "technician",
+      "orgContextIds": [
+        "4741"
+      ],
+      "securityGroupIds": []
+    },
+    {
+      "id": "d688158b-746b-47a1-8756-03694ab4455b",
+      "email": "nsrmanager@nsrpetro.com",
+      "phone": "2020000000",
+      "password": "admin",
+      "role": "subadmin",
+      "orgContextIds": [
+        "4741"
+      ],
+      "permissions": [
+        "subadmin.placeTicket",
+        "subadmin.verifyJobCompleted"
+      ]
+    },
+    {
+      "id": "32168c79-78f3-48d2-87f0-0c2e77935aea",
+      "email": "nsroffice@nsrpetro.com",
+      "phone": "2029990000",
+      "password": "admin",
+      "role": "subadmin",
+      "orgContextIds": [
+        "4741"
+      ],
+      "permissions": [
+        "subadmin.acceptTicket"
       ]
     }
   ],
