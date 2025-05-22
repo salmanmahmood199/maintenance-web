@@ -280,6 +280,20 @@ const Vendors = () => {
     });
   };
 
+  // Helper to format email addresses for cleaner display
+  const formatEmail = (email) => {
+    if (!email) return '';
+    
+    // If the email contains a plus sign, truncate it for display
+    if (email.includes('+')) {
+      const [username, domain] = email.split('@');
+      const cleanUsername = username.split('+')[0];
+      return `${cleanUsername}@${domain}`;
+    }
+    
+    return email;
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
       {/* Organization context title and breadcrumbs */}
@@ -387,7 +401,9 @@ const Vendors = () => {
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <EmailIcon fontSize="small" sx={{ mr: 0.5, opacity: 0.7 }} />
-                        <Typography variant="body2">{vendor.email}</Typography>
+                        <Typography variant="body2" title={vendor.email}>
+                          {formatEmail(vendor.email)}
+                        </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                         <PhoneIcon fontSize="small" sx={{ mr: 0.5, opacity: 0.7 }} />
