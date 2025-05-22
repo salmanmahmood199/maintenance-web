@@ -119,6 +119,7 @@ const Tickets = () => {
   const [actionType, setActionType] = useState(null);
   const [actionNote, setActionNote] = useState('');
   const [selectedVendor, setSelectedVendor] = useState('');
+  const [filteredVendors, setFilteredVendors] = useState([]);
   const [moreInfoDialogOpen, setMoreInfoDialogOpen] = useState(false);
   const [additionalInfo, setAdditionalInfo] = useState('');
   
@@ -504,9 +505,53 @@ const Tickets = () => {
     setActionType(type);
     setActionNote('');
     setSelectedVendor('');
+    
+    // Always initialize filteredVendors as an empty array to prevent undefined errors
+    setFilteredVendors([]);
+    
+    // For ticket assignment, filter vendors to only show those associated with the ticket's organization
+    if (type === 'assign' && selectedTicket) {
+      try {
+        // Get the organization ID from the location
+        const location = locations.find(loc => loc.id === selectedTicket.locationId);
+        if (location && location.orgId) {
+          const orgId = location.orgId;
+          console.log('Found location with orgId:', orgId);
+          
+          // Make sure we have vendors loaded
+          if (!Array.isArray(vendors) || vendors.length === 0) {
+            let allVendors = getVendors();
+            // Ensure allVendors is an array
+            allVendors = Array.isArray(allVendors) ? allVendors : [];
+            setVendors(allVendors);
+            
+            // Filter vendors for this organization
+            const orgVendors = allVendors.filter(vendor => 
+              vendor && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId)
+            ) || [];
+            setFilteredVendors(orgVendors);
+            console.log('Filtered new vendors for org:', orgVendors.length);
+          } else {
+            // Filter vendors to only show those assigned to this organization
+            const orgVendors = vendors.filter(vendor => 
+              vendor && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId)
+            ) || [];
+            setFilteredVendors(orgVendors);
+            console.log('Filtered existing vendors for org:', orgVendors.length);
+          }
+        } else {
+          console.log('Location or orgId not found');
+          setFilteredVendors([]);
+        }
+      } catch (error) {
+        console.error('Error filtering vendors:', error);
+        setFilteredVendors([]);
+      }
+    }
+    
     setActionDialogOpen(true);
   };
-  
+
   // Handle action dialog close
   const handleCloseActionDialog = () => {
     setActionDialogOpen(false);
@@ -591,12 +636,34 @@ const Tickets = () => {
     if (!ticket) return null;
     
     const currentStep = determineCurrentStep(ticket);
+    console.log('Current step for ticket', ticket.id, ':', currentStep);
+    console.log('User role:', user.role, 'hasPermission:', user.permissions);
     
     // Buttons for each workflow stage
     switch (currentStep) {
       case 'created':
-        // New ticket - need tier 1 access to accept and assign
-        if (hasTicketTierAccess('1', ticket.locationId)) {
+      case 'pending_approval':
+        // New ticket - office staff can accept and assign
+        // Added explicit check for subadmin role or root to ensure office staff can always assign
+        // Fix any ticket that shows as 'Assigned' without a vendor
+        if ((ticket.status === 'Assigned' || ticket.status === 'assigned') && !ticket.vendorId) {
+          console.log('Found ticket with Assigned status but no vendor, showing assign button:', ticket.id);
+          return (
+            <Button
+              variant="contained"
+              color="warning"
+              startIcon={<AssignIcon />}
+              onClick={() => handleActionClick('assign')}
+            >
+              Re-Assign Ticket
+            </Button>
+          );
+        }
+        
+        if (user.role === 'root' || 
+            (user.role === 'subadmin' && 
+             (user.permissions?.includes('subadmin.acceptTicket') || 
+              hasTicketTierAccess('1', ticket.locationId)))) {
           return (
             <Button
               variant="contained"
@@ -1342,12 +1409,12 @@ const Tickets = () => {
                 label="Vendor"
                 onChange={(e) => setSelectedVendor(e.target.value)}
               >
-                {vendors.length === 0 ? (
+                {!Array.isArray(filteredVendors) || filteredVendors.length === 0 ? (
                   <MenuItem disabled value="">
                     No vendors available
                   </MenuItem>
                 ) : (
-                  vendors.map((vendor) => (
+                  filteredVendors.map((vendor) => (
                     <MenuItem key={vendor.id} value={vendor.id}>
                       {vendor.name}
                     </MenuItem>

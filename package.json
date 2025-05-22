@@ -11,6 +11,11 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "mongodb": "^6.5.0",
+    "mongoose": "^8.3.3",
     "node-fetch": "^3.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -24,7 +29,10 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "server": "node server.js"
+    "server": "node server.js",
+    "server:mongodb": "node server-mongodb.js",
+    "migrate": "node migrate-to-mongodb.js",
+    "normalize-vendors": "node normalize-vendors.js"
   },
   "eslintConfig": {
     "extends": [

@@ -8,7 +8,7 @@ A React-based web application for managing maintenance tickets, organizations, v
 - **UI Library**: Material-UI v5 (dark mode + theming)
 - **Routing**: React Router v6
 - **State Management**: React Context (AuthContext + DataContext)
-- **Data Persistence**: LocalStorage (for MVP)
+- **Data Persistence**: MongoDB (previously used json-server with local db.json)
 
 ## Features
 
@@ -45,6 +45,21 @@ maintenance-web/
 - Node.js (v14 or later)
 - npm or yarn
 
+## MongoDB Setup
+
+This application uses MongoDB for data persistence. Follow these steps to set up the MongoDB connection:
+
+1. Create a `.env` file in the root directory (use `.env.example` as a template)
+2. Add your MongoDB connection string to the `.env` file:
+   ```
+   MONGODB_URI=mongodb+srv://<username>:<password>@<your-cluster-url>/<database-name>?retryWrites=true&w=majority
+   PORT=3004
+   ```
+3. Run the migration script to transfer data to MongoDB (if you have existing data):
+   ```
+   npm run migrate
+   ```
+
 ## Available Scripts
 
 In the project directory, you can run:
@@ -56,6 +71,21 @@ Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
 The page will reload when you make changes.\
 You may also see any lint errors in the console.
+
+### `npm run server:mongodb`
+
+Runs the MongoDB server on port 3004.\
+This serves as your backend API for the application.
+
+### `npm run migrate`
+
+Migrates data from a local db.json file to MongoDB.\
+Use this when setting up the application for the first time with existing data.
+
+### `npm run normalize-vendors`
+
+Normalizes vendor data in MongoDB to ensure consistency.\
+This helps resolve common vendor-related issues.
 
 ### `npm test`
 

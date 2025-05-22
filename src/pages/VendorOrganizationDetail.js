@@ -27,7 +27,8 @@ import {
   TableHead,
   TableRow,
   Alert,
-  FormHelperText
+  FormHelperText,
+  Tooltip
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -440,16 +441,58 @@ const VendorOrganizationDetail = () => {
                         }
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          variant="outlined" 
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/ticket/${ticket.id}`);
-                          }}
-                        >
-                          View
-                        </Button>
+                        {/* Only show action buttons for tickets that need vendor response */}
+                        {(ticket.status === 'New' || ticket.status === 'Assigned') && !ticket.vendorResponseStatus ? (
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Tooltip title="Accept ticket">
+                              <IconButton 
+                                color="success" 
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenResponseDialog(ticket.id, 'accept');
+                                }}
+                              >
+                                <AcceptIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Reject ticket">
+                              <IconButton 
+                                color="error" 
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenResponseDialog(ticket.id, 'reject');
+                                }}
+                              >
+                                <RejectIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Request more information">
+                              <IconButton 
+                                color="info" 
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenResponseDialog(ticket.id, 'moreInfo');
+                                }}
+                              >
+                                <RequestInfoIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        ) : (
+                          <Button 
+                            variant="outlined" 
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/ticket/${ticket.id}`);
+                            }}
+                          >
+                            View
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

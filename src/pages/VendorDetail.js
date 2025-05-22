@@ -79,7 +79,7 @@ const VendorDetail = () => {
     getTickets
   } = useData();
 
-  // State
+  // State - ALL useState hooks need to be at the top level before any conditionals
   const [tabValue, setTabValue] = useState(0);
   const [technicianDialog, setTechnicianDialog] = useState(false);
   const [technicianForm, setTechnicianForm] = useState({
@@ -106,11 +106,20 @@ const VendorDetail = () => {
   const [techOrgSelections, setTechOrgSelections] = useState({});
   // For the more intuitive tickets filter
   const [ticketsFilterMenuAnchor, setTicketsFilterMenuAnchor] = useState(null);
+  // State for technicians list - moved up from conditional position
+  const [technicians, setTechnicians] = useState([]);
+
+  // Load technicians when component mounts - moved up from conditional position
+  useEffect(() => {
+    if (id) {
+      setTechnicians(getTechnicians(id));
+    }
+  }, [id, getTechnicians]);
 
   // Get vendor data
   const vendor = getVendor(id);
   
-  // Early return if vendor not found - must be after all useState calls
+  // Early return if vendor not found - now safe because all hooks are declared above
   if (!vendor) {
     return (
       <Box sx={{ p: 3 }}>
@@ -125,9 +134,6 @@ const VendorDetail = () => {
       </Box>
     );
   }
-
-  // State for technicians list
-  const [technicians, setTechnicians] = useState([]);
   
   // Get related data
   const organizations = getOrganizations();
@@ -136,11 +142,6 @@ const VendorDetail = () => {
   // Get tickets assigned to this vendor
   const allTickets = getTickets();
   const vendorTickets = allTickets.filter(ticket => ticket.assignedVendorId === id);
-  
-  // Load technicians when component mounts
-  useEffect(() => {
-    setTechnicians(getTechnicians(id));
-  }, [id, getTechnicians]);
   
   // Function to get consistent color for organization
   const getOrgColor = (orgId) => {
