@@ -29,7 +29,8 @@ import {
   Select,
   InputLabel,
   FormHelperText,
-  Divider
+  Divider,
+  ListItemText
 } from '@mui/material';
 import { 
   Add as AddIcon,
@@ -552,6 +553,42 @@ const Vendors = () => {
             
             {/* Always show vendor relationship fields */}
             <Box sx={{ mt: isOrgContext && editVendorId ? 0 : 2 }}>
+              {isOrgContext && (
+                <FormControl fullWidth margin="normal">
+                  <InputLabel id="tier-label">Vendor Tier</InputLabel>
+                  <Select
+                    labelId="tier-label"
+                    id="tier"
+                    name="tier"
+                    value={formData.tier || 1}
+                    label="Vendor Tier"
+                    onChange={handleChange}
+                  >
+                    <MenuItem value={1}>
+                      <ListItemText
+                        primary="Tier 1 (Standard)"
+                        secondary="Regular maintenance and basic issues"
+                      />
+                    </MenuItem>
+                    <MenuItem value={2}>
+                      <ListItemText
+                        primary="Tier 2 (Advanced)"
+                        secondary="Complex repairs and specialty work"
+                      />
+                    </MenuItem>
+                    <MenuItem value={3}>
+                      <ListItemText
+                        primary="Tier 3 (Critical)"
+                        secondary="Emergency services and major systems"
+                      />
+                    </MenuItem>
+                  </Select>
+                  <FormHelperText>
+                    Vendor tier determines service level and priority
+                  </FormHelperText>
+                </FormControl>
+              )}
+              
               <FormControl fullWidth margin="normal">
                 <InputLabel id="status-label">Status</InputLabel>
                 <Select
