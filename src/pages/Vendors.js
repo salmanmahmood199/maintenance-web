@@ -140,7 +140,7 @@ const Vendors = () => {
         email: vendorToEdit.email.split('+')[0] + '@' + vendorToEdit.email.split('@')[1], // Remove timestamp from email
         phone: vendorToEdit.phone,
         password: '', // Don't show the password
-        tier: vendorToEdit.tier || 'standard',
+        // tier removed - will be assigned per organization
         status: vendorToEdit.status || 'active',
         specialties: vendorToEdit.specialties || '',
         orgIds: vendorToEdit.orgIds
@@ -152,7 +152,7 @@ const Vendors = () => {
         email: '',
         phone: '',
         password: '',
-        tier: 'standard',
+        // tier removed - will be assigned per organization
         status: 'active',
         specialties: '',
         orgIds: isOrgContext ? [orgId] : []
@@ -572,24 +572,7 @@ const Vendors = () => {
                 </FormHelperText>
               </FormControl>
               
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="tier-label">Vendor Tier</InputLabel>
-                <Select
-                  labelId="tier-label"
-                  id="tier"
-                  name="tier"
-                  value={formData.tier || 1}
-                  label="Vendor Tier"
-                  onChange={handleChange}
-                >
-                  <MenuItem value={1}>Tier 1 (Standard)</MenuItem>
-                  <MenuItem value={2}>Tier 2 (Premium)</MenuItem>
-                  <MenuItem value={3}>Tier 3 (Enterprise)</MenuItem>
-                </Select>
-                <FormHelperText>
-                  Vendor tier determines service level and priority
-                </FormHelperText>
-              </FormControl>
+              {/* Tier field removed - tiers should be assigned within organization context */}
             </Box>
             
             {/* Only show organization selection when not in organization context */}

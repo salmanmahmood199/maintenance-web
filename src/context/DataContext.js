@@ -437,7 +437,8 @@ export const DataProvider = ({ children }) => {
       email: vendor.email,
       phone: vendor.phone,
       status: 'active',
-      tier: vendor.tier || 1,
+      // Tier is no longer set during vendor creation
+      // It will be set per organization context later
       orgIds: vendor.orgIds
     };
     
