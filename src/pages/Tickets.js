@@ -506,6 +506,7 @@ const Tickets = () => {
     setFilteredVendors([]);
     
     // For ticket assignment, filter vendors to only show those associated with the ticket's organization
+    // We're NOT checking for location assignment - only organization membership
     if (type === 'assign' && selectedTicket) {
       try {
         // Get the organization ID from the location
@@ -521,19 +522,21 @@ const Tickets = () => {
             allVendors = Array.isArray(allVendors) ? allVendors : [];
             setVendors(allVendors);
             
-            // Filter vendors for this organization
+            // Filter vendors for this organization - ONLY check org membership, not location assignment
             const orgVendors = allVendors.filter(vendor => 
-              vendor && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId)
+              vendor && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId) && 
+              vendor.status !== 'inactive' // Only show active vendors
             ) || [];
             setFilteredVendors(orgVendors);
-            console.log('Filtered new vendors for org:', orgVendors.length);
+            console.log('Filtered vendors for org:', orgVendors.length);
           } else {
             // Filter vendors to only show those assigned to this organization
             const orgVendors = vendors.filter(vendor => 
-              vendor && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId)
+              vendor && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId) &&
+              vendor.status !== 'inactive' // Only show active vendors
             ) || [];
             setFilteredVendors(orgVendors);
-            console.log('Filtered existing vendors for org:', orgVendors.length);
+            console.log('Filtered vendors for org:', orgVendors.length);
           }
         } else {
           console.log('Location or orgId not found');

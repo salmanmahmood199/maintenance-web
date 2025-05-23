@@ -749,33 +749,51 @@ export const DataProvider = ({ children }) => {
         }
       ]
     });
-  };
-  
-  // Assign a ticket to a vendor
-  const assignTicket = (id, vendorId) => {
-    const ticket = getTicket(id);
-    if (!ticket) return false;
-    
-    // Update ticket with vendor assignment
-    updateTicket(id, {
-      ...ticket,
-      vendorId,
-      status: 'Assigned',
-      currentStep: 'waiting_vendor_response',
-      workOrders: [
-        ...(ticket.workOrders || []),
-        {
-          type: 'assigned',
-          timestamp: new Date().toISOString(),
-          note: `Ticket assigned to vendor`,
-          vendorId
-        }
-      ],
-      updatedAt: new Date().toISOString()
-    });
     
     return true;
   };
+
+// Assign a ticket to a vendor
+// Only checks that the vendor is part of the organization, not assigned to specific locations
+const assignTicket = (id, vendorId) => {
+  const ticket = getTicket(id);
+  if (!ticket) return false;
+  
+  // Get the vendor
+  const vendor = getItem('vendors', vendorId);
+  if (!vendor) return false;
+  
+  // Get the location to find the organization
+  const location = getItem('locations', ticket.locationId);
+  if (!location) return false;
+  
+  // Check if vendor belongs to the organization
+  const belongsToOrg = vendor.orgIds && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(location.orgId);
+  if (!belongsToOrg) {
+    console.error('Vendor does not belong to the organization of this ticket');
+    return false;
+  }
+  
+  // Update ticket with vendor assignment
+  updateTicket(id, {
+    ...ticket,
+    vendorId,
+    status: 'Assigned',
+    currentStep: 'waiting_vendor_response',
+    workOrders: [
+      ...(ticket.workOrders || []),
+      {
+        type: 'assigned',
+        timestamp: new Date().toISOString(),
+        note: `Ticket assigned to vendor`,
+        vendorId
+      }
+    ],
+    updatedAt: new Date().toISOString()
+  });
+  
+  return true;
+};
   
   // Handle vendor accepting a ticket
   const acceptTicketByVendor = (id, note = '') => {
@@ -786,7 +804,7 @@ export const DataProvider = ({ children }) => {
     // Update ticket with vendor acceptance
     updateTicket(id, {
       ...ticket,
-      status: 'Assigned',
+      status: 'In Progress',
       currentStep: 'vendor_accepted',
       workOrders: [
         ...(ticket.workOrders || []),
