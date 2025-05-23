@@ -1,8 +1,13 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
 
 // Create context
 const DataContext = createContext();
+
+// Check if localStorage should be disabled
+const isLocalStorageDisabled = process.env.REACT_APP_DISABLE_LOCAL_STORAGE === 'true';
+console.log('localStorage disabled:', isLocalStorageDisabled);
 
 // System configuration
 const systemConfig = {
@@ -157,37 +162,81 @@ const TICKET_WORKFLOW = [
 
 // Data provider component
 export const DataProvider = ({ children }) => {
-  const [data, setData] = useState(() => {
-    // Try to load from localStorage if available
-    const savedData = localStorage.getItem('maintenanceAppData');
-    const baseData = savedData ? JSON.parse(savedData) : initialData;
-    
-    // Ensure all collections are initialized as arrays
-    const ensuredData = {
-      ...baseData,
-      organizations: Array.isArray(baseData.organizations) ? baseData.organizations : [],
-      vendors: Array.isArray(baseData.vendors) ? baseData.vendors : [],
-      subAdmins: Array.isArray(baseData.subAdmins) ? baseData.subAdmins : [],
-      securityGroups: Array.isArray(baseData.securityGroups) ? baseData.securityGroups : initialData.securityGroups,
-      availablePermissions: Array.isArray(baseData.availablePermissions) ? baseData.availablePermissions : initialData.availablePermissions,
-      locations: Array.isArray(baseData.locations) ? baseData.locations : [],
-      tickets: Array.isArray(baseData.tickets) ? baseData.tickets : [],
-      technicians: Array.isArray(baseData.technicians) ? baseData.technicians : [],
-      users: Array.isArray(baseData.users) ? baseData.users : initialData.users
-    };
-    
-    return ensuredData;
-  });
-
-  // Save to localStorage whenever data changes
-  useEffect(() => {
+  // Data state
+  const [data, setData] = useState(initialData);
+  
+  // MongoDB API access functions
+  const fetchFromMongoDB = async (endpoint) => {
     try {
-      localStorage.setItem('maintenanceAppData', JSON.stringify(data));
-    } catch (e) {
-      console.error('Error saving data to localStorage:', e);
+      // Use direct server URL with port 3004 where MongoDB server is running
+      const response = await axios.get(`http://localhost:3004/${endpoint}`);
+      console.log(`Fetched data from MongoDB (${endpoint}):`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching from MongoDB (${endpoint}):`, error);
+      return null;
     }
-  }, [data]);
-
+  };
+  
+  const fetchOrganizationsFromMongoDB = async () => {
+    const result = await fetchFromMongoDB('organizations');
+    return result || [];
+  };
+  
+  const fetchVendorsFromMongoDB = async () => {
+    const result = await fetchFromMongoDB('vendors');
+    return result || [];
+  };
+  
+  const fetchSubAdminsFromMongoDB = async () => {
+    const result = await fetchFromMongoDB('subadmins');
+    return result || [];
+  };
+  
+  const fetchLocationsFromMongoDB = async () => {
+    const result = await fetchFromMongoDB('locations');
+    return result || [];
+  };
+  
+  const fetchTicketsFromMongoDB = async () => {
+    const result = await fetchFromMongoDB('tickets');
+    return result || [];
+  };
+  
+  const loadAllDataFromMongoDB = async () => {
+    try {
+      const [organizations, vendors, subAdmins, locations, tickets] = await Promise.all([
+        fetchOrganizationsFromMongoDB(),
+        fetchVendorsFromMongoDB(),
+        fetchSubAdminsFromMongoDB(),
+        fetchLocationsFromMongoDB(),
+        fetchTicketsFromMongoDB()
+      ]);
+      
+      setData(prevData => ({
+        ...prevData,
+        organizations,
+        vendors,
+        subAdmins,
+        locations,
+        tickets
+      }));
+      
+      console.log('Successfully loaded all data from MongoDB');
+    } catch (error) {
+      console.error('Error loading data from MongoDB:', error);
+    }
+  };
+  
+  useEffect(() => {
+    // Always load data directly from MongoDB API
+    console.log('Loading data directly from MongoDB API...');
+    loadAllDataFromMongoDB();
+  }, []);
+  
+  // No longer saving to localStorage since we're using MongoDB exclusively
+  // Data changes are handled directly through API calls to MongoDB
+  
   // Validation helpers
   const isEmailUnique = (email, excludeId = null) => {
     // Check across all user types
@@ -217,38 +266,106 @@ export const DataProvider = ({ children }) => {
   };
   
   // Generic CRUD operations
-  const addItem = (collection, item) => {
+  const addItem = async (collection, item) => {
+    if (!data[collection]) {
+      console.error(`Collection ${collection} does not exist`);
+      return null;
+    }
+    
     const newItem = { ...item, id: item.id || uuidv4() };
-    setData(prev => {
-      const currentCollection = Array.isArray(prev[collection]) ? prev[collection] : [];
-      return {
-        ...prev,
-        [collection]: [...currentCollection, newItem]
-      };
-    });
+    
+    // If localStorage is disabled, save directly to MongoDB
+    if (isLocalStorageDisabled) {
+      try {
+        const response = await axios.post(`http://localhost:3004/${collection.toLowerCase()}s`, newItem);
+        if (response.data) {
+          // Update local state with the newly created item from MongoDB
+          setData({ ...data, [collection]: [...data[collection], response.data] });
+          return response.data;
+        }
+      } catch (error) {
+        console.error(`Error adding item to MongoDB (${collection}):`, error);
+      }
+    }
+    
+    // Default behavior (using state/localStorage)
+    setData({ ...data, [collection]: [...data[collection], newItem] });
     return newItem;
   };
   
-  const updateItem = (collection, id, updatedItem) => {
-    setData(prev => {
-      const currentCollection = Array.isArray(prev[collection]) ? prev[collection] : [];
-      return {
-        ...prev,
-        [collection]: currentCollection.map(item => 
-          item.id === id ? { ...item, ...updatedItem } : item
-        )
-      };
-    });
+  const updateItem = async (collection, id, updatedItem) => {
+    if (!data[collection]) {
+      console.error(`Collection ${collection} does not exist`);
+      return false;
+    }
+    
+    // If localStorage is disabled, update directly in MongoDB
+    if (isLocalStorageDisabled) {
+      try {
+        const response = await axios.put(`http://localhost:3004/${collection.toLowerCase()}s/${id}`, updatedItem);
+        if (response.data) {
+          // Find and update the item in the local state
+          const index = data[collection].findIndex(item => item.id === id);
+          if (index !== -1) {
+            const updatedCollection = [...data[collection]];
+            updatedCollection[index] = response.data;
+            setData({ ...data, [collection]: updatedCollection });
+          } else {
+            // If item wasn't in local state, refresh data from MongoDB
+            loadAllDataFromMongoDB();
+          }
+          return true;
+        }
+      } catch (error) {
+        console.error(`Error updating item in MongoDB (${collection}):`, error);
+        return false;
+      }
+    } else {
+      // Default behavior (using state/localStorage)
+      const index = data[collection].findIndex(item => item.id === id);
+      if (index === -1) return false;
+      
+      const updatedCollection = [...data[collection]];
+      updatedCollection[index] = { ...updatedCollection[index], ...updatedItem };
+      setData({ ...data, [collection]: updatedCollection });
+      return true;
+    }
   };
   
-  const deleteItem = (collection, id) => {
-    setData(prev => {
-      const currentCollection = Array.isArray(prev[collection]) ? prev[collection] : [];
-      return {
-        ...prev,
-        [collection]: currentCollection.filter(item => item.id !== id)
-      };
-    });
+  const deleteItem = async (collection, id) => {
+    if (!data[collection]) {
+      console.error(`Collection ${collection} does not exist`);
+      return false;
+    }
+    
+    // If localStorage is disabled, delete directly from MongoDB
+    if (isLocalStorageDisabled) {
+      try {
+        await axios.delete(`http://localhost:3004/${collection.toLowerCase()}s/${id}`);
+        // Update local state
+        setData(prev => {
+          const currentCollection = Array.isArray(prev[collection]) ? prev[collection] : [];
+          return {
+            ...prev,
+            [collection]: currentCollection.filter(item => item.id !== id)
+          };
+        });
+        return true;
+      } catch (error) {
+        console.error(`Error deleting item from MongoDB (${collection}):`, error);
+        return false;
+      }
+    } else {
+      // Default behavior (using state/localStorage)
+      setData(prev => {
+        const currentCollection = Array.isArray(prev[collection]) ? prev[collection] : [];
+        return {
+          ...prev,
+          [collection]: currentCollection.filter(item => item.id !== id)
+        };
+      });
+      return true;
+    }
   };
   
   const getItem = (collection, id) => {
@@ -1145,6 +1262,9 @@ export const DataProvider = ({ children }) => {
   // Context value with all operations
   const value = {
     data,
+    isLocalStorageDisabled,
+    loadAllDataFromMongoDB,
+    fetchFromMongoDB,
     
     // Users
     addUser,

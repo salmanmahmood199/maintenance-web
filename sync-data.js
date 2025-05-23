@@ -20,158 +20,202 @@ function extractLocalStorageData() {
     // Check if we're in a browser environment or Node.js
     if (typeof window !== 'undefined' && window.localStorage) {
       console.log('Reading from browser localStorage...');
-      return JSON.parse(localStorage.getItem('maintenanceAppData'));
-    } else {
-      // When running in Node.js, ask the user to export the data first
-      console.log('This script needs to be run in the browser to access localStorage data.');
-      console.log('Please follow the manual steps below:');
-      console.log('1. Open your browser console on your app (localhost:3000)');
-      console.log('2. Run this command to get localStorage data:');
-      console.log('   const data = JSON.parse(localStorage.getItem("maintenanceAppData"))');
-      console.log('3. Then run:');
-      console.log('   console.log(JSON.stringify(data, null, 2))');
-      console.log('4. Copy the output and save it to a file named "local-data.json"');
-      console.log('5. Then run this script again with: node sync-data.js --from-file');
-      
-      // Check if we're trying to read from a file as fallback
-      if (process.argv.includes('--from-file')) {
-        try {
-          const localDataPath = path.join(__dirname, 'local-data.json');
-          if (fs.existsSync(localDataPath)) {
-            return JSON.parse(fs.readFileSync(localDataPath, 'utf8'));
-          } else {
-            console.error(`File not found: ${localDataPath}`);
-            console.log('Please create this file with your localStorage data first.');
-            return null;
-          }
-        } catch (fileErr) {
-          console.error('Error reading local-data.json file:', fileErr);
-          return null;
-        }
+
+// Path to backups directory
+const backupDir = path.join(__dirname, 'database-backups');
+
+// Ensure backups directory exists
+if (!fs.existsSync(backupDir)) {
+  fs.mkdirSync(backupDir);
+}
+
+// Data types to extract from localStorage with their corresponding model
+const dataTypes = [
+  { name: 'organizations', model: Organization },
+  { name: 'vendors', model: Vendor },
+  { name: 'locations', model: Location },
+  { name: 'subAdmins', model: SubAdmin },
+  { name: 'tickets', model: Ticket },
+  { name: 'technicians', model: Technician },
+  { name: 'users', model: User }
+];
+
+// Initialize data object
+const extractedData = {};
+
+// Function to process localStorage data
+async function processLocalStorage(filePath) {
+  if (!filePath) {
+    console.error('Please provide a path to the localStorage backup file');
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(filePath)) {
+    console.error(`File not found: ${filePath}`);
+    process.exit(1);
+  }
+
+  console.log(`Reading localStorage data from ${filePath}...`);
+  const fileContent = fs.readFileSync(filePath, 'utf8');
+  let localStorageData;
+
+  try {
+    localStorageData = JSON.parse(fileContent);
+  } catch (error) {
+    console.error('Error parsing localStorage data:', error);
+    process.exit(1);
+  }
+
+  // Extract data for each type
+  dataTypes.forEach(type => {
+    const key = `maintenance-web-${type.name}`;
+    if (localStorageData[key]) {
+      try {
+        extractedData[type.name] = JSON.parse(localStorageData[key]);
+      } catch (error) {
+        console.error(`Error parsing ${key}:`, error);
       }
-      
-      return null;
-    }
-  } catch (error) {
-    console.error('Error extracting localStorage data:', error);
-    return null;
-  }
-}
-
-// Function to read the current db.json file
-function readDbJson() {
-  try {
-    return JSON.parse(fs.readFileSync(dbJsonPath, 'utf8'));
-  } catch (error) {
-    console.error('Error reading db.json:', error);
-    return null;
-  }
-}
-
-// Function to write to db.json file
-function writeDbJson(data) {
-  try {
-    // Create a backup of the current db.json first
-    const backupPath = `${dbJsonPath}.backup-${new Date().toISOString().replace(/:/g, '-')}`;
-    fs.copyFileSync(dbJsonPath, backupPath);
-    console.log(`Created backup at: ${backupPath}`);
-    
-    // Write the new data to db.json
-    fs.writeFileSync(dbJsonPath, JSON.stringify(data, null, 2));
-    console.log('Successfully updated db.json!');
-    return true;
-  } catch (error) {
-    console.error('Error writing to db.json:', error);
-    return false;
-  }
-}
-
-// Function to merge localStorage data with db.json
-function mergeData(localData, dbData) {
-  if (!localData || !dbData) {
-    console.error('Cannot merge: missing data');
-    return null;
-  }
-  
-  // Create a new object for the merged data
-  const mergedData = { ...dbData };
-  
-  // Loop through each key in localData and merge with dbData
-  Object.keys(localData).forEach(key => {
-    if (Array.isArray(localData[key]) && Array.isArray(mergedData[key])) {
-      // For arrays, we need to merge based on IDs to avoid duplicates
-      const idMap = new Map();
-      
-      // Add existing items from db.json to the map
-      mergedData[key].forEach(item => {
-        if (item.id) {
-          idMap.set(item.id, item);
-        }
-      });
-      
-      // Add/update items from localStorage
-      localData[key].forEach(item => {
-        if (item.id) {
-          idMap.set(item.id, item);
-        }
-      });
-      
-      // Convert map back to array
-      mergedData[key] = Array.from(idMap.values());
-    } else {
-      // For non-arrays, use the localStorage data
-      mergedData[key] = localData[key];
     }
   });
-  
-  return mergedData;
 }
 
-// Function to send data to JSON server
-async function updateJsonServer(data) {
-  try {
-    // Direct file update is more reliable for our case
-    const success = writeDbJson(data);
-    
-    if (success) {
-      console.log('Data has been successfully synchronized!');
-      console.log('You may need to restart your JSON server to see the changes.');
-      console.log('To restart, press Ctrl+C to stop the server and run:');
-      console.log('npm run server');
+// Function to create MongoDB backup
+async function createMongoBackup() {
+  console.log('Creating MongoDB backup...');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupData = {};
+  
+  // Get all data from MongoDB
+  for (const type of dataTypes) {
+    try {
+      const items = await type.model.find({});
+      backupData[type.name] = items;
+    } catch (error) {
+      console.error(`Error getting ${type.name} from MongoDB:`, error);
     }
-  } catch (error) {
-    console.error('Error updating JSON server:', error);
   }
+  
+  // Save backup to file
+  const backupFilePath = path.join(backupDir, `mongo-backup-${timestamp}.json`);
+  fs.writeFileSync(backupFilePath, JSON.stringify(backupData, null, 2));
+  console.log(`MongoDB backup created at ${backupFilePath}`);
+}
+
+// Function to merge localStorage data with MongoDB
+async function mergeDataWithMongo(localData) {
+  const results = {};
+  
+  // Process each data type
+  for (const type of dataTypes) {
+    const typeName = type.name;
+    const Model = type.model;
+    
+    if (!localData[typeName] || !Array.isArray(localData[typeName])) {
+      results[typeName] = { added: 0, updated: 0 };
+      continue;
+    }
+    
+    console.log(`Processing ${typeName}...`);
+    const added = [];
+    const updated = [];
+    
+    // Process each item from localStorage
+    for (const item of localData[typeName]) {
+      if (!item.id) continue;
+      
+      try {
+        // Check if item exists in MongoDB
+        const existingItem = await Model.findOne({ id: item.id });
+        
+        if (existingItem) {
+          // Update existing item
+          await Model.findOneAndUpdate({ id: item.id }, item, { new: true });
+          updated.push(item.id);
+        } else {
+          // Add new item
+          const newItem = new Model(item);
+          await newItem.save();
+          added.push(item.id);
+        }
+      } catch (error) {
+        console.error(`Error processing ${typeName} item ${item.id}:`, error);
+      }
+    }
+    
+    results[typeName] = { added: added.length, updated: updated.length };
+  }
+  
+  return results;
+}
+
+// Prompt for confirmation
+function promptForConfirmation(message) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  
+  return new Promise(resolve => {
+    rl.question(`${message} (y/n): `, answer => {
+      rl.close();
+      resolve(answer.toLowerCase() === 'y');
+    });
+  });
 }
 
 // Main function
-async function syncData() {
-  // Get data from localStorage (or file in Node.js context)
-  const localData = extractLocalStorageData();
-  if (!localData) {
-    console.error('Failed to get localStorage data');
-    return;
+async function main() {
+  try {
+    // Connect to MongoDB
+    await connectDB();
+    console.log('Connected to MongoDB');
+    
+    // Process localStorage data
+    await processLocalStorage(localStoragePath);
+    
+    // Check if we have data to process
+    const hasData = Object.keys(extractedData).some(type => {
+      return extractedData[type] && extractedData[type].length > 0;
+    });
+    
+    if (!hasData) {
+      console.log('No data found in localStorage backup.');
+      process.exit(0);
+    }
+    
+    // Print summary of data found
+    console.log('\nData extracted from localStorage:');
+    dataTypes.forEach(type => {
+      const count = extractedData[type.name] ? extractedData[type.name].length : 0;
+      console.log(`- ${type.name}: ${count} items`);
+    });
+    
+    // Ask for confirmation
+    const confirmed = await promptForConfirmation('\nDo you want to merge this data with MongoDB?');
+    if (!confirmed) {
+      console.log('Operation cancelled.');
+      process.exit(0);
+    }
+    
+    // Create backup of current MongoDB data
+    await createMongoBackup();
+    
+    // Merge the data with MongoDB
+    const results = await mergeDataWithMongo(extractedData);
+    
+    // Print results
+    console.log('\nSync results:');
+    Object.keys(results).forEach(type => {
+      console.log(`- ${type}: ${results[type].added} added, ${results[type].updated} updated`);
+    });
+    
+    console.log('\nData successfully synced to MongoDB!');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error:', error);
+    process.exit(1);
   }
-  
-  // Get current data from db.json
-  const dbData = readDbJson();
-  if (!dbData) {
-    console.error('Failed to read db.json');
-    return;
-  }
-  
-  // Merge the data
-  const mergedData = mergeData(localData, dbData);
-  if (!mergedData) {
-    console.error('Failed to merge data');
-    return;
-  }
-  
-  // Update the JSON server
-  await updateJsonServer(mergedData);
 }
 
-// Run the sync process
-syncData().catch(error => {
-  console.error('Error in syncData:', error);
-});
+// Run the main function
+main();

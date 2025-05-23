@@ -1,23 +1,170 @@
-const jsonServer = require('json-server');
-const server = jsonServer.create();
-const router = jsonServer.router('db.json');
-const middlewares = jsonServer.defaults();
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const connectDB = require('./src/db/mongodb');
+const mongoose = require('mongoose');
+
+// Import models
+const Organization = require('./src/models/Organization');
+const Vendor = require('./src/models/Vendor');
+const Location = require('./src/models/Location');
+const SubAdmin = require('./src/models/SubAdmin');
+const Ticket = require('./src/models/Ticket');
+const Technician = require('./src/models/Technician');
+const User = require('./src/models/User');
+
+const app = express();
 const port = 3000;
 
-// Set default middlewares (logger, static, cors and no-cache)
-server.use(middlewares);
+// Connect to MongoDB
+connectDB();
 
-// Add custom routes before JSON Server router
-server.get('/health', (req, res) => {
-  res.jsonp({ status: 'up' });
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'up' });
 });
 
-// To handle POST, PUT and PATCH you need to use a body-parser
-server.use(jsonServer.bodyParser);
+// Helper function to handle API responses
+const handleResponse = (res, data, statusCode = 200) => {
+  return res.status(statusCode).json(data);
+};
 
-// Use default router
-server.use(router);
+const handleError = (res, error, statusCode = 500) => {
+  console.error('API Error:', error);
+  return res.status(statusCode).json({ 
+    error: error.message || 'An error occurred while processing your request' 
+  });
+};
 
-server.listen(port, () => {
-  console.log(`JSON Server is running on port ${port}`);
+// Generic CRUD routes for each model
+const createCrudRoutes = (app, modelName, Model) => {
+  const path = `/${modelName.toLowerCase()}s`;
+  
+  // Get all items
+  app.get(path, async (req, res) => {
+    try {
+      const items = await Model.find({});
+      handleResponse(res, items);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  
+  // Get single item by ID
+  app.get(`${path}/:id`, async (req, res) => {
+    try {
+      const item = await Model.findOne({ id: req.params.id });
+      if (!item) {
+        return handleError(res, { message: `${modelName} not found` }, 404);
+      }
+      handleResponse(res, item);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  
+  // Create new item
+  app.post(path, async (req, res) => {
+    try {
+      const newItem = new Model(req.body);
+      const savedItem = await newItem.save();
+      handleResponse(res, savedItem, 201);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  
+  // Update item
+  app.put(`${path}/:id`, async (req, res) => {
+    try {
+      const updatedItem = await Model.findOneAndUpdate(
+        { id: req.params.id },
+        req.body,
+        { new: true, runValidators: true }
+      );
+      
+      if (!updatedItem) {
+        return handleError(res, { message: `${modelName} not found` }, 404);
+      }
+      
+      handleResponse(res, updatedItem);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  
+  // Delete item
+  app.delete(`${path}/:id`, async (req, res) => {
+    try {
+      const deletedItem = await Model.findOneAndDelete({ id: req.params.id });
+      
+      if (!deletedItem) {
+        return handleError(res, { message: `${modelName} not found` }, 404);
+      }
+      
+      handleResponse(res, { message: `${modelName} deleted successfully` });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+};
+
+// Create CRUD routes for all models
+createCrudRoutes(app, 'Organization', Organization);
+createCrudRoutes(app, 'Vendor', Vendor);
+createCrudRoutes(app, 'Location', Location);
+createCrudRoutes(app, 'SubAdmin', SubAdmin);
+createCrudRoutes(app, 'Ticket', Ticket);
+createCrudRoutes(app, 'Technician', Technician);
+createCrudRoutes(app, 'User', User);
+
+// Add specific custom routes as needed
+
+// Get vendors by organization ID (handles both orgIds and orgContextIds)
+app.get('/vendors/organization/:orgId', async (req, res) => {
+  try {
+    const orgId = req.params.orgId;
+    const vendors = await Vendor.find({
+      $or: [
+        { orgIds: orgId },
+        { orgContextIds: orgId }
+      ]
+    });
+    handleResponse(res, vendors);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Get vendors by service
+app.get('/vendors/service/:service', async (req, res) => {
+  try {
+    const service = req.params.service;
+    const vendors = await Vendor.find({
+      $or: [
+        { services: service },
+        { specialties: { $regex: service, $options: 'i' } }
+      ]
+    });
+    handleResponse(res, vendors);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`MongoDB Server is running on port ${port}`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.log('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.log(err.name, err.message);
+  process.exit(1);
 });
