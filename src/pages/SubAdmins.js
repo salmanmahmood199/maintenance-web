@@ -319,12 +319,10 @@ const SubAdmins = () => {
       
       let updatedTiers;
       if (checked) {
-        // Special handling for Tier 1A and Tier 1B - they're mutually exclusive
-        if (tier === '1A' || tier === '1B') {
-          // Remove the other tier 1 option if it exists
-          const otherTier = tier === '1A' ? '1B' : '1A';
-          updatedTiers = locationPermissions.tiers.filter(t => t !== otherTier);
-          // Add the selected tier
+        // Special migration handling - if adding Tier 1, remove legacy 1A and 1B if they exist
+        if (tier === 1) {
+          updatedTiers = locationPermissions.tiers.filter(t => t !== '1A' && t !== '1B');
+          // Add Tier 1
           updatedTiers.push(tier);
         } else {
           // For other tiers, just add if not already included
@@ -950,27 +948,17 @@ const SubAdmins = () => {
                                 {locationPermissions.acceptTicket && (
                                   <Box sx={{ ml: 4, mt: 0.5 }}>
                                     <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                                      Select tiers this admin can manage:
+                                      Select access tiers this admin can manage:
                                     </Typography>
                                     <FormControlLabel
                                       control={
                                         <Checkbox
-                                          checked={locationPermissions.tiers?.includes('1A') || false}
-                                          onChange={(e) => handleTierPermissionChange(loc.id, '1A', e.target.checked)}
+                                          checked={locationPermissions.tiers?.includes(1) || locationPermissions.tiers?.includes('1A') || locationPermissions.tiers?.includes('1B') || false}
+                                          onChange={(e) => handleTierPermissionChange(loc.id, 1, e.target.checked)}
                                           size="small"
                                         />
                                       }
-                                      label={<Typography variant="body2">Tier 1A (Top Priority)</Typography>}
-                                    />
-                                    <FormControlLabel
-                                      control={
-                                        <Checkbox
-                                          checked={locationPermissions.tiers?.includes('1B') || false}
-                                          onChange={(e) => handleTierPermissionChange(loc.id, '1B', e.target.checked)}
-                                          size="small"
-                                        />
-                                      }
-                                      label={<Typography variant="body2">Tier 1B</Typography>}
+                                      label={<Typography variant="body2">Tier 1 Access</Typography>}
                                     />
                                     <FormControlLabel
                                       control={
@@ -980,7 +968,7 @@ const SubAdmins = () => {
                                           size="small"
                                         />
                                       }
-                                      label={<Typography variant="body2">Tier 2</Typography>}
+                                      label={<Typography variant="body2">Tier 2 Access</Typography>}
                                     />
                                     <FormControlLabel
                                       control={
@@ -990,7 +978,7 @@ const SubAdmins = () => {
                                           size="small"
                                         />
                                       }
-                                      label={<Typography variant="body2">Tier 3</Typography>}
+                                      label={<Typography variant="body2">Tier 3 Access</Typography>}
                                     />
                                   </Box>
                                 )}

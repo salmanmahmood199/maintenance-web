@@ -357,7 +357,7 @@ const Vendors = () => {
             <TableRow>
               <TableCell>Vendor</TableCell>
               <TableCell>Contact</TableCell>
-              <TableCell>Tier</TableCell>
+              <TableCell>Access Tier</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Assigned Locations</TableCell>
               <TableCell align="right">Actions</TableCell>
@@ -414,8 +414,8 @@ const Vendors = () => {
                   </TableCell>
                   <TableCell>
                     <Chip 
-                      label={`Tier ${vendor.tier || 1}`}
-                      color={vendor.tier === 3 ? "error" : vendor.tier === 2 ? "warning" : "primary"}
+                      label={`T${vendor.tier || 1} Access`}
+                      color={vendor.tier === 3 ? "error" : vendor.tier === 2 ? "warning" : "info"}
                       size="small"
                       sx={{ borderRadius: '4px' }}
                     />
@@ -555,36 +555,36 @@ const Vendors = () => {
             <Box sx={{ mt: isOrgContext && editVendorId ? 0 : 2 }}>
               {isOrgContext && (
                 <FormControl fullWidth margin="normal">
-                  <InputLabel id="tier-label">Vendor Tier</InputLabel>
+                  <InputLabel id="tier-label">Access Control Tier</InputLabel>
                   <Select
                     labelId="tier-label"
                     id="tier"
                     name="tier"
                     value={formData.tier || 1}
-                    label="Vendor Tier"
+                    label="Access Control Tier"
                     onChange={handleChange}
                   >
                     <MenuItem value={1}>
                       <ListItemText
-                        primary="Tier 1 (Standard)"
-                        secondary="Regular maintenance and basic issues"
+                        primary="Tier 1 Access"
+                        secondary="Basic access to organization tickets"
                       />
                     </MenuItem>
                     <MenuItem value={2}>
                       <ListItemText
-                        primary="Tier 2 (Advanced)"
-                        secondary="Complex repairs and specialty work"
+                        primary="Tier 2 Access"
+                        secondary="Intermediate access level for more complex tickets"
                       />
                     </MenuItem>
                     <MenuItem value={3}>
                       <ListItemText
-                        primary="Tier 3 (Critical)"
-                        secondary="Emergency services and major systems"
+                        primary="Tier 3 Access"
+                        secondary="Highest access level for critical tickets"
                       />
                     </MenuItem>
                   </Select>
                   <FormHelperText>
-                    Vendor tier determines service level and priority
+                    Tier level controls which tickets this vendor can access within this organization
                   </FormHelperText>
                 </FormControl>
               )}

@@ -128,16 +128,16 @@ const OrganizationDetailRevised = () => {
   // Define available roles - matching the roles in SubAdmins.js for consistency
   const availableRoles = [
     { id: 'subadmin.placeTicket', label: 'Place Ticket', description: 'Create a new maintenance ticket: fill in location, issue type, description, upload media, and submit it.' },
-    { id: 'subadmin.acceptTicket', label: 'Accept Ticket', description: 'Pick up ("accept") an unassigned ticket at Tier 1: you see New tickets and can assign them to vendors.' },
-    { id: 'subadmin.tier2AcceptTicket', label: 'Tier 2 Accept Ticket', description: 'Accept or reassign tickets that have escalated past Tier 1 (i.e. Tier 2 queue).' },
-    { id: 'subadmin.tier3AcceptTicket', label: 'Tier 3 Accept Ticket', description: 'Accept or reassign tickets that have escalated past Tier 2 (i.e. Tier 3 queue).' },
+    { id: 'subadmin.acceptTicket', label: 'Tier 1 Access', description: 'Access and manage Tier 1 tickets - standard access level.' },
+    { id: 'subadmin.tier2AcceptTicket', label: 'Tier 2 Access', description: 'Access and manage Tier 2 tickets - intermediate access level.' },
+    { id: 'subadmin.tier3AcceptTicket', label: 'Tier 3 Access', description: 'Access and manage Tier 3 tickets - highest access level.' },
     { id: 'subadmin.addVendor', label: 'Add Vendor', description: 'Add a new vendor record to the org: enter name, email, phone, password, and link them to one/multiple orgs.' },
     { id: 'subadmin.addIssueType', label: 'Add Issue Type', description: 'Extend the "Type of Issue" lookup: add new categories like "Elevator" or "Electrical."' },
     { id: 'subadmin.acceptInvoice', label: 'Accept Invoice', description: 'Review and approve a vendor-generated invoice before it goes to accounts payable.' },
     { id: 'subadmin.addLocation', label: 'Add Location', description: 'Create new locations (stores/sites) under the org: set name, address, contact info.' },
     { id: 'subadmin.assignLocation', label: 'Assign Location', description: 'Assign users (managers or sub-admins) to one or more locations so they can place/see tickets there.' },
     { id: 'subadmin.verifyJobCompleted', label: 'Verify Job Completed', description: 'After a tech marks "Completed," verify the work order and close out the ticket.' },
-    { id: 'subadmin.manageVendors', label: 'Manage Vendors', description: 'Adjust vendor tier/level, approve vendors, change which orgs they can serve.' }
+    { id: 'subadmin.manageVendors', label: 'Manage Vendors', description: 'Adjust vendor access tiers, approve vendors, change which orgs they can serve.' }
   ];
   
   // Get available permissions from the availableRoles
