@@ -446,6 +446,14 @@ const Tickets = () => {
     return vendor ? vendor.name : 'Unassigned';
   };
 
+  // This function gets the assigned vendor for a ticket
+  // It checks both vendorId and assignedVendorId fields for compatibility
+  const getAssignedVendor = (ticket) => {
+    // Try both vendorId and assignedVendorId fields (for backward compatibility)
+    const vendorId = ticket.vendorId || ticket.assignedVendorId;
+    return getVendorName(vendorId);
+  };
+
   // Format date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -584,7 +592,8 @@ const Tickets = () => {
       
       // Refresh tickets data after action
       const updatedTickets = getTickets();
-      setFilteredTickets(updatedTickets.filter(ticket => applyFilters([ticket]).length > 0));
+      // Update tickets state to trigger the useEffect that will call applyFilters
+      setTickets(updatedTickets);
       
       // Get updated ticket info
       const updatedTicket = getTicket(selectedTicket.id);
@@ -987,7 +996,7 @@ const Tickets = () => {
                       size="small" 
                     />
                   </TableCell>
-                  <TableCell>{getVendorName(ticket.assignedVendorId)}</TableCell>
+                  <TableCell>{getAssignedVendor(ticket)}</TableCell>
                   <TableCell>
                     <IconButton
                       color="primary"

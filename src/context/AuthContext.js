@@ -33,18 +33,31 @@ export const AuthProvider = ({ children }) => {
       return true;
     }
     
-    // DIRECTLY CHECK SALMAN'S ACCOUNT - TEMPORARY WORKAROUND
-    if (email === 'salman@nsrpetro.com' && password === 'admin') {
-      // Fetch latest data directly from server
-      try {
-        // Get user from server
-        const userResponse = await fetch('http://localhost:3004/users?email=salman@nsrpetro.com');
-        const users = await userResponse.json();
-        if (users && users.length > 0) {
-          const userData = users[0];
-          
-          // Get subAdmin data for additional info
-          const subAdminResponse = await fetch('http://localhost:3004/subAdmins?email=salman@nsrpetro.com');
+    try {
+      // Try to find user by email in MongoDB
+      const apiUrl = `http://localhost:3004/api/users/login`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      if (!response.ok) {
+        // If we get a non-200 response, throw an error
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+      
+      // Parse the user data
+      const userData = await response.json();
+      
+      // For each role, get additional data if needed
+      if (userData.role === 'subadmin') {
+        // Get subAdmin data
+        const subAdminResponse = await fetch(`http://localhost:3004/api/subAdmins?email=${encodeURIComponent(email)}`);
+        if (subAdminResponse.ok) {
           const subAdmins = await subAdminResponse.json();
           if (subAdmins && subAdmins.length > 0) {
             const subAdmin = subAdmins[0];
@@ -56,72 +69,42 @@ export const AuthProvider = ({ children }) => {
             userData.permissions = [...new Set([...existingPermissions, ...ticketBasePermissions])];
             userData.userType = 'Office Staff'; // Default user type
           }
-          
-          // Save to localStorage
-          localStorage.setItem('maintenanceAppUser', JSON.stringify(userData));
-          setUser(userData);
-          return true;
         }
-      } catch (error) {
-        console.error('Error in direct login:', error);
-      }
-    }
-    
-    // Get all users from localStorage
-    const storedData = localStorage.getItem('maintenanceAppData');
-    if (!storedData) return false;
-    
-    const appData = JSON.parse(storedData);
-    
-    // Find the user with matching email and password
-    const users = Array.isArray(appData.users) ? appData.users : [];
-    const foundUser = users.find(u => u.email === email && u.password === password);
-    
-    if (foundUser) {
-      // Get additional info based on role
-      let userData = { ...foundUser };
-      
-      // For subadmins, get their name from subAdmins collection
-      if (foundUser.role === 'subadmin') {
-        const subAdmins = Array.isArray(appData.subAdmins) ? appData.subAdmins : [];
-        const subAdmin = subAdmins.find(sa => sa.email === email);
-        if (subAdmin) {
-          userData.name = subAdmin.name;
-          userData.organizationId = subAdmin.organizationId;
-          // Ensure all sub-admins have at least basic ticket permissions
-          const ticketBasePermissions = ['subadmin.placeTicket', 'subadmin.viewTickets'];
-          const existingPermissions = subAdmin.permissions || [];
-          userData.permissions = [...new Set([...existingPermissions, ...ticketBasePermissions])];
-          userData.userType = 'Office Staff'; // Default user type
+      } 
+      else if (userData.role === 'vendor') {
+        // Get vendor data
+        const vendorResponse = await fetch(`http://localhost:3004/api/vendors?email=${encodeURIComponent(email)}`);
+        if (vendorResponse.ok) {
+          const vendors = await vendorResponse.json();
+          if (vendors && vendors.length > 0) {
+            const vendor = vendors[0];
+            userData.name = vendor.name;
+            userData.vendorId = vendor.id;
+          }
         }
-      }
-      // For vendors, get their name from vendors collection
-      else if (foundUser.role === 'vendor') {
-        const vendors = Array.isArray(appData.vendors) ? appData.vendors : [];
-        const vendor = vendors.find(v => v.email === email);
-        if (vendor) {
-          userData.name = vendor.name;
-          userData.vendorId = vendor.id;
-        }
-      }
-      // For technicians, get their name from technicians collection
-      else if (foundUser.role === 'technician') {
-        const technicians = Array.isArray(appData.technicians) ? appData.technicians : [];
-        const tech = technicians.find(t => t.email === email);
-        if (tech) {
-          userData.name = tech.name;
-          userData.technicianId = tech.id;
-          userData.vendorId = tech.vendorId;
+      } 
+      else if (userData.role === 'technician') {
+        // Get technician data
+        const techResponse = await fetch(`http://localhost:3004/api/technicians?email=${encodeURIComponent(email)}`);
+        if (techResponse.ok) {
+          const technicians = await techResponse.json();
+          if (technicians && technicians.length > 0) {
+            const tech = technicians[0];
+            userData.name = tech.name;
+            userData.technicianId = tech.id;
+            userData.vendorId = tech.vendorId;
+          }
         }
       }
       
-      // Save to localStorage
+      // Save user data to local storage
       localStorage.setItem('maintenanceAppUser', JSON.stringify(userData));
       setUser(userData);
       return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    
-    return false;
   };
 
   // Logout function

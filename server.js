@@ -29,6 +29,33 @@ app.get('/health', (req, res) => {
   res.json({ status: 'up' });
 });
 
+// Login endpoint
+app.post('/api/users/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Find the user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if password matches
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+    
+    // Return user data without the password
+    const userData = user.toObject();
+    delete userData.password;
+    
+    res.json(userData);
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Helper function to handle API responses
 const handleResponse = (res, data, statusCode = 200) => {
   return res.status(statusCode).json(data);
