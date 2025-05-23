@@ -1151,44 +1151,8 @@ export const DataProvider = ({ children }) => {
       // Check if they can accept tickets for this location
       if (!locationPermissions.acceptTicket) return false;
       
-      // Handle Tier 1A and 1B as special cases
-      if (tier === 1) {
-        // For Tier 1, check if they have either 1A or 1B access
-        return locationPermissions.tiers?.includes('1A') || locationPermissions.tiers?.includes('1B');
-      } else if (tier === '1A') {
-        // Direct check for Tier 1A access
-        return locationPermissions.tiers?.includes('1A');
-      } else if (tier === '1B') {
-        // For Tier 1B, either they have direct 1B access OR
-        // it's a ticket that's been pending for over 24 hours and they have 1B access
-        const has1BAccess = locationPermissions.tiers?.includes('1B');
-        
-        if (has1BAccess && ticket) {
-          // Always allow if they have 1B access
-          return true;
-        } else if (!has1BAccess && ticket) {
-          // If they don't have 1B access directly, check if:  
-          // 1. The ticket has been pending for over 24 hours
-          // 2. They have 1A access
-          // 3. The ticket is still in 'New' status
-          
-          if (ticket.status !== 'New') return false;
-          
-          // Check if ticket creation time was over 24 hours ago
-          const ticketTime = new Date(ticket.createdAt).getTime();
-          const currentTime = new Date().getTime();
-          const elapsedTime = currentTime - ticketTime;
-          
-          // If it's been more than the configured escalation time, allow 1B access
-          if (elapsedTime >= systemConfig.tier1AToTier1BEscalationTime && locationPermissions.tiers?.includes('1A')) {
-            return true;
-          }
-        }
-        return has1BAccess;
-      } else {
-        // For Tier 2 and 3, check numeric values
-        return locationPermissions.tiers?.includes(tier);
-      }
+      // Simple tier-based access check (1, 2, or 3)
+      return locationPermissions.tiers?.includes(tier);
     }
     
     // If no location-specific permissions are set, fall back to the general permissions
@@ -1224,17 +1188,7 @@ export const DataProvider = ({ children }) => {
     return getItems('locations', loc => subAdmin.assignedLocationIds.includes(loc.id));
   };
 
-  // Check if a ticket should be escalated from Tier 1A to Tier 1B
-  const shouldEscalateToTier1B = (ticket) => {
-    if (!ticket || ticket.status !== 'New') return false;
-    
-    // Check if the ticket was created more than 24 hours ago
-    const ticketTime = new Date(ticket.createdAt).getTime();
-    const currentTime = new Date().getTime();
-    const elapsedTime = currentTime - ticketTime;
-    
-    return elapsedTime >= systemConfig.tier1AToTier1BEscalationTime;
-  };
+  // Tier escalation has been removed - tiers are now only for access control
   
   // Context value with all operations
   const value = {
@@ -1322,7 +1276,7 @@ export const DataProvider = ({ children }) => {
     getAccessibleLocations,
     
     // Ticket Escalation
-    shouldEscalateToTier1B,
+    // shouldEscalateToTier1B removed - tiers are now only for access control
     systemConfig
   };
 

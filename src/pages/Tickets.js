@@ -105,7 +105,6 @@ const Tickets = () => {
     verifyCompletion,
     hasLocationAccess,
     hasTicketTierAccess,
-    shouldEscalateToTier1B,
     systemConfig,
     getAccessibleLocations,
     provideMoreInfo
@@ -384,17 +383,14 @@ const Tickets = () => {
         return;
       }
       
-      // Determine initial tier based on priority
-      // Tier 1 is default, but we'll set an additional property for 1A/1B distinction
-      let ticketTier = 1;
-      let is1A = formData.priority === 'high';
+      // All tickets are now set to Tier 1 for access control purposes only
+      // Tier is no longer based on severity or priority
       
       // Create ticket data
       const newTicket = {
         ...formData,
         status: 'New',
-        tier: ticketTier,       // Numeric tier (1, 2, or 3)
-        tierType: is1A ? '1A' : '1B', // String designation for Tier 1 subtypes
+        tier: 1,     // All tickets start at Tier 1 for access control purposes
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         createdBy: user?.id || 'anonymous',
@@ -942,7 +938,7 @@ const Tickets = () => {
               <TableCell>Date/Time</TableCell>
               <TableCell>Location</TableCell>
               <TableCell>Issue Type</TableCell>
-              <TableCell>Priority/Tier</TableCell>
+              <TableCell>Priority & Access Tier</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Assigned To</TableCell>
               <TableCell>Actions</TableCell>
@@ -971,25 +967,13 @@ const Tickets = () => {
                         size="small"
                         color={ticket.priority === 'high' ? 'error' : ticket.priority === 'low' ? 'default' : 'primary'}
                       />
-                      {ticket.tierType && (
+                      {ticket.tier && (
                         <Chip 
                           size="small" 
-                          label={`Tier ${ticket.tierType}`}
-                          color={ticket.tierType === '1A' ? 'error' : 'default'}
+                          label={`Access Tier ${ticket.tier}`}
+                          color="info"
                           sx={{ ml: 1 }}
                         />
-                      )}
-                      {/* Show escalation indicator if the ticket is over 24 hours old */}
-                      {shouldEscalateToTier1B(ticket) && (
-                        <Tooltip title={`Escalated to Tier 1B after ${systemConfig.tier1AToTier1BEscalationTime/(1000*60*60)} hours`}>
-                          <Chip 
-                            size="small" 
-                            label="1B Eligible"
-                            color="warning"
-                            variant="outlined"
-                            sx={{ ml: 1 }}
-                          />
-                        </Tooltip>
                       )}
                     </Box>
                   </TableCell>
