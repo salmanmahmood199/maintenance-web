@@ -10,8 +10,7 @@ import theme from './theme';
 import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 
-// Data Sync Utilities
-import { setupAutoSync, setupUnloadSync, addSyncButton } from './utils/syncToServer';
+// MongoDB connection is now handled directly in DataContext
 
 // Components
 import Layout from './components/Layout';
@@ -33,25 +32,8 @@ import Locations from './pages/Locations';
 import Tickets from './pages/Tickets';
 
 function App() {
-  // Set up data synchronization between localStorage and JSON server
-  useEffect(() => {
-    // Set up auto sync every 5 minutes
-    const cleanupAutoSync = setupAutoSync(300000);
-    
-    // Set up sync on page unload
-    const cleanupUnloadSync = setupUnloadSync();
-    
-    // Add sync button to the UI after component mount
-    setTimeout(() => {
-      addSyncButton('root');
-    }, 1000);
-    
-    // Cleanup function
-    return () => {
-      cleanupAutoSync();
-      cleanupUnloadSync();
-    };
-  }, []);
+  // No need for sync setup since we're now directly connected to MongoDB
+  // All data modifications are automatically persisted
   
   return (
     <ThemeProvider theme={theme}>

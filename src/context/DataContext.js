@@ -5,8 +5,8 @@ import axios from 'axios';
 // Create context
 const DataContext = createContext();
 
-// Check if localStorage should be disabled
-const isLocalStorageDisabled = process.env.REACT_APP_DISABLE_LOCAL_STORAGE === 'true';
+// Always use MongoDB API directly
+const isLocalStorageDisabled = true;
 console.log('localStorage disabled:', isLocalStorageDisabled);
 
 // System configuration
@@ -234,9 +234,6 @@ export const DataProvider = ({ children }) => {
     loadAllDataFromMongoDB();
   }, []);
   
-  // No longer saving to localStorage since we're using MongoDB exclusively
-  // Data changes are handled directly through API calls to MongoDB
-  
   // Validation helpers
   const isEmailUnique = (email, excludeId = null) => {
     // Check across all user types
@@ -274,21 +271,19 @@ export const DataProvider = ({ children }) => {
     
     const newItem = { ...item, id: item.id || uuidv4() };
     
-    // If localStorage is disabled, save directly to MongoDB
-    if (isLocalStorageDisabled) {
-      try {
-        const response = await axios.post(`http://localhost:3004/${collection.toLowerCase()}s`, newItem);
-        if (response.data) {
-          // Update local state with the newly created item from MongoDB
-          setData({ ...data, [collection]: [...data[collection], response.data] });
-          return response.data;
-        }
-      } catch (error) {
-        console.error(`Error adding item to MongoDB (${collection}):`, error);
+    try {
+      // Always save directly to MongoDB
+      const response = await axios.post(`http://localhost:3004/${collection.toLowerCase()}s`, newItem);
+      if (response.data) {
+        // Update local state with the newly created item from MongoDB
+        setData({ ...data, [collection]: [...data[collection], response.data] });
+        return response.data;
       }
+    } catch (error) {
+      console.error(`Error adding item to MongoDB (${collection}):`, error);
     }
     
-    // Default behavior (using state/localStorage)
+    // Fallback behavior only in case of API error
     setData({ ...data, [collection]: [...data[collection], newItem] });
     return newItem;
   };
@@ -299,37 +294,29 @@ export const DataProvider = ({ children }) => {
       return false;
     }
     
-    // If localStorage is disabled, update directly in MongoDB
-    if (isLocalStorageDisabled) {
-      try {
-        const response = await axios.put(`http://localhost:3004/${collection.toLowerCase()}s/${id}`, updatedItem);
-        if (response.data) {
-          // Find and update the item in the local state
-          const index = data[collection].findIndex(item => item.id === id);
-          if (index !== -1) {
-            const updatedCollection = [...data[collection]];
-            updatedCollection[index] = response.data;
-            setData({ ...data, [collection]: updatedCollection });
-          } else {
-            // If item wasn't in local state, refresh data from MongoDB
-            loadAllDataFromMongoDB();
-          }
+    try {
+      // Always update directly in MongoDB
+      const response = await axios.put(`http://localhost:3004/${collection.toLowerCase()}s/${id}`, updatedItem);
+      if (response.data) {
+        // Find and update the item in the local state
+        const index = data[collection].findIndex(item => item.id === id);
+        if (index !== -1) {
+          const updatedCollection = [...data[collection]];
+          updatedCollection[index] = response.data;
+          setData({ ...data, [collection]: updatedCollection });
           return true;
         }
-      } catch (error) {
-        console.error(`Error updating item in MongoDB (${collection}):`, error);
-        return false;
       }
-    } else {
-      // Default behavior (using state/localStorage)
-      const index = data[collection].findIndex(item => item.id === id);
-      if (index === -1) return false;
-      
-      const updatedCollection = [...data[collection]];
-      updatedCollection[index] = { ...updatedCollection[index], ...updatedItem };
-      setData({ ...data, [collection]: updatedCollection });
-      return true;
+    } catch (error) {
+      console.error(`Error updating item in MongoDB (${collection}):`, error);
     }
+    
+    // Fallback behavior only in case of API error
+    const updatedCollection = data[collection].map(item => 
+      item.id === id ? { ...item, ...updatedItem } : item
+    );
+    setData({ ...data, [collection]: updatedCollection });
+    return true;
   };
   
   const deleteItem = async (collection, id) => {
@@ -338,34 +325,23 @@ export const DataProvider = ({ children }) => {
       return false;
     }
     
-    // If localStorage is disabled, delete directly from MongoDB
-    if (isLocalStorageDisabled) {
-      try {
-        await axios.delete(`http://localhost:3004/${collection.toLowerCase()}s/${id}`);
-        // Update local state
-        setData(prev => {
-          const currentCollection = Array.isArray(prev[collection]) ? prev[collection] : [];
-          return {
-            ...prev,
-            [collection]: currentCollection.filter(item => item.id !== id)
-          };
-        });
-        return true;
-      } catch (error) {
-        console.error(`Error deleting item from MongoDB (${collection}):`, error);
-        return false;
-      }
-    } else {
-      // Default behavior (using state/localStorage)
-      setData(prev => {
-        const currentCollection = Array.isArray(prev[collection]) ? prev[collection] : [];
-        return {
-          ...prev,
-          [collection]: currentCollection.filter(item => item.id !== id)
-        };
-      });
+    try {
+      // Always delete directly from MongoDB
+      await axios.delete(`http://localhost:3004/${collection.toLowerCase()}s/${id}`);
+      
+      // Remove from local state
+      const updatedCollection = data[collection].filter(item => item.id !== id);
+      setData({ ...data, [collection]: updatedCollection });
       return true;
+    } catch (error) {
+      console.error(`Error deleting item from MongoDB (${collection}):`, error);
+      
+      // Fallback behavior only in case of API error
+      const updatedCollection = data[collection].filter(item => item.id !== id);
+      setData({ ...data, [collection]: updatedCollection });
     }
+    
+    return true;
   };
   
   const getItem = (collection, id) => {

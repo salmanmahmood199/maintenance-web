@@ -1,141 +1,97 @@
 /**
- * Utility to sync data between localStorage and the JSON server
+ * Utility to interact with the MongoDB API server
+ * 
+ * Since we've migrated to MongoDB exclusively, this file has been updated
+ * to reflect that we no longer need localStorage syncing, but kept some
+ * utility functions for API health checks and data refreshing.
  */
 
-// JSON Server API URL
+// MongoDB API URL
 const API_URL = 'http://localhost:3004';
 
-// Function to get data from localStorage
-export const getLocalData = () => {
+// Function to check if the MongoDB API server is running
+export const checkServerHealth = async () => {
   try {
-    const data = localStorage.getItem('maintenanceAppData');
-    return data ? JSON.parse(data) : null;
+    const response = await fetch(`${API_URL}/health`);
+    if (!response.ok) {
+      throw new Error(`API server health check failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return { 
+      success: true, 
+      status: data.status,
+      message: 'API server is running' 
+    };
   } catch (error) {
-    console.error('Error reading from localStorage:', error);
-    return null;
+    console.error('API server health check error:', error);
+    return { 
+      success: false, 
+      status: 'down',
+      message: `API server error: ${error.message}` 
+    };
   }
 };
 
-// Function to sync data from localStorage to the JSON server
-export const syncToServer = async () => {
+// Function to refresh data from MongoDB server
+export const refreshFromServer = async () => {
   try {
-    // Get data from localStorage
-    const localData = getLocalData();
-    if (!localData) {
-      console.error('No data found in localStorage');
-      return { success: false, message: 'No data found in localStorage' };
-    }
-
-    // Get current data from server
-    const response = await fetch(`${API_URL}/`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch data from JSON server: ${response.status}`);
+    // Check server health first
+    const healthCheck = await checkServerHealth();
+    if (!healthCheck.success) {
+      return healthCheck;
     }
     
-    const serverData = await response.json();
-    
-    // Merge the data
-    const mergedData = mergeData(localData, serverData);
-    
-    // Update the server data
-    const updateResponse = await fetch(`${API_URL}/db`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(mergedData)
-    });
-    
-    if (!updateResponse.ok) {
-      throw new Error(`Failed to update JSON server: ${updateResponse.status}`);
-    }
+    // Trigger a page refresh to reload all data from MongoDB
+    window.location.reload();
     
     return { 
       success: true, 
-      message: 'Data successfully synchronized with server' 
+      message: 'Data refreshed from database' 
     };
   } catch (error) {
-    console.error('Error syncing data to server:', error);
+    console.error('Error refreshing data:', error);
     return { 
       success: false, 
-      message: `Error syncing data: ${error.message}` 
+      message: `Error refreshing data: ${error.message}` 
     };
   }
 };
 
-// Function to merge localStorage data with server data
-const mergeData = (localData, serverData) => {
-  if (!localData || !serverData) {
-    throw new Error('Cannot merge: missing data');
-  }
-  
-  // Create a new object for the merged data
-  const mergedData = { ...serverData };
-  
-  // Process each entity type
-  Object.keys(localData).forEach(key => {
-    if (Array.isArray(localData[key]) && Array.isArray(mergedData[key])) {
-      // For arrays, merge based on IDs to avoid duplicates
-      const idMap = new Map();
-      
-      // Add existing server items to the map
-      mergedData[key].forEach(item => {
-        if (item.id) {
-          idMap.set(item.id, item);
-        }
-      });
-      
-      // Add/update items from localStorage
-      localData[key].forEach(item => {
-        if (item.id) {
-          idMap.set(item.id, item);
-        }
-      });
-      
-      // Convert map back to array
-      mergedData[key] = Array.from(idMap.values());
-    } else {
-      // For non-arrays, use the localStorage data if available
-      mergedData[key] = localData[key];
-    }
-  });
-  
-  return mergedData;
+// This function is no longer needed since we're using MongoDB directly
+// It's kept here for backward compatibility but now just refreshes from server
+export const syncToServer = async () => {
+  return await refreshFromServer();
 };
 
-// Function to sync data on component mount
+// Function to check MongoDB server status periodically
 export const setupAutoSync = (interval = 60000) => {
-  // Sync on initial load
-  syncToServer();
+  // Initial health check
+  checkServerHealth();
   
-  // Set up periodic sync
-  const syncInterval = setInterval(() => {
-    syncToServer();
+  // Set up periodic health checks
+  const healthCheckInterval = setInterval(() => {
+    checkServerHealth();
   }, interval);
   
   // Return cleanup function
-  return () => clearInterval(syncInterval);
+  return () => clearInterval(healthCheckInterval);
 };
 
-// Sync before unloading the page
+// This function is no longer needed but kept for backward compatibility
 export const setupUnloadSync = () => {
-  const handleBeforeUnload = () => {
-    syncToServer();
-  };
-  
-  window.addEventListener('beforeunload', handleBeforeUnload);
-  
-  // Return cleanup function
-  return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  // No need to sync before unloading since we're directly using MongoDB
+  // Return empty cleanup function for compatibility
+  return () => {};
 };
 
-// Setup a function to add a sync button to the UI
+// Setup a function to add a refresh button to the UI
 export const addSyncButton = (containerId) => {
   const container = document.getElementById(containerId);
   if (!container) return;
   
   const button = document.createElement('button');
-  button.textContent = 'Sync to Server';
+  button.textContent = 'Refresh Data';
   button.style.position = 'fixed';
   button.style.bottom = '20px';
   button.style.right = '20px';
@@ -150,16 +106,19 @@ export const addSyncButton = (containerId) => {
   
   button.addEventListener('click', async () => {
     button.disabled = true;
-    button.textContent = 'Syncing...';
+    button.textContent = 'Refreshing...';
     
-    const result = await syncToServer();
+    const result = await refreshFromServer();
     
-    button.textContent = result.success ? '✓ Synced!' : '❌ Failed';
-    
-    setTimeout(() => {
-      button.textContent = 'Sync to Server';
-      button.disabled = false;
-    }, 2000);
+    if (!result.success) {
+      button.textContent = '❌ Failed';
+      
+      setTimeout(() => {
+        button.textContent = 'Refresh Data';
+        button.disabled = false;
+      }, 2000);
+    }
+    // No need for success case handling since page will refresh
   });
   
   container.appendChild(button);
