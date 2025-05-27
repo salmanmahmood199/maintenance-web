@@ -3,7 +3,10 @@ require('dotenv').config();
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+    // Always use local MongoDB - hardcoded for consistency
+    const MONGODB_URI = 'mongodb://localhost:27017/maintenance_web';
+    
+    const conn = await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });

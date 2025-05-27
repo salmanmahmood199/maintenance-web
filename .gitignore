@@ -25,3 +25,16 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Local utility and test scripts
+create-test-organization.js
+public/test-api.html
+reset-database.js
+seed-local-db.js
+server-3001.js
+start-local-dev.js
+test-api-call.js
+test-api-url.js
+test-subadmin-creation.js
+update-api-urls.js
+update-mongodb-config.js

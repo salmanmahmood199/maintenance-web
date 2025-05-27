@@ -1,7 +1,8 @@
 /**
  * Script to seed MongoDB with sample data
  */
-require('dotenv').config();
+// Set MongoDB URI to local database directly - no need for dotenv
+process.env.MONGODB_URI = 'mongodb://localhost:27017/maintenance_web';
 const connectDB = require('./src/db/mongodb');
 const { v4: uuidv4 } = require('uuid');
 

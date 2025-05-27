@@ -166,10 +166,12 @@ export const DataProvider = ({ children }) => {
   const [data, setData] = useState(initialData);
   
   // MongoDB API access functions
+  const API_URL = 'http://localhost:3001';
+  
   const fetchFromMongoDB = async (endpoint) => {
     try {
-      // Use direct server URL with port 3004 where MongoDB server is running
-      const response = await axios.get(`http://localhost:3004/${endpoint}`);
+      // Always use port 3001 for API access
+      const response = await axios.get(`${API_URL}/${endpoint}`);
       console.log(`Fetched data from MongoDB (${endpoint}):`, response.data);
       return response.data;
     } catch (error) {
@@ -272,18 +274,25 @@ export const DataProvider = ({ children }) => {
     const newItem = { ...item, id: item.id || uuidv4() };
     
     try {
+      console.log(`Adding ${collection} to MongoDB:`, newItem);
       // Always save directly to MongoDB
-      const response = await axios.post(`http://localhost:3004/${collection.toLowerCase()}s`, newItem);
+      const response = await axios.post(`/${collection}`, newItem);
       if (response.data) {
+        console.log(`Successfully added ${collection} to MongoDB:`, response.data);
         // Update local state with the newly created item from MongoDB
         setData({ ...data, [collection]: [...data[collection], response.data] });
         return response.data;
       }
     } catch (error) {
       console.error(`Error adding item to MongoDB (${collection}):`, error);
+      // Show error to the user
+      alert(`Error creating ${collection.slice(0, -1)}: ${error.message}. Check console for details.`);
+      // Do not update local state or return item on error
+      return null;
     }
     
-    // Fallback behavior only in case of API error
+    // This should only execute if response.data is falsy but no error was thrown
+    console.warn(`Warning: ${collection} was not properly saved to MongoDB`);
     setData({ ...data, [collection]: [...data[collection], newItem] });
     return newItem;
   };
@@ -296,7 +305,7 @@ export const DataProvider = ({ children }) => {
     
     try {
       // Always update directly in MongoDB
-      const response = await axios.put(`http://localhost:3004/${collection.toLowerCase()}s/${id}`, updatedItem);
+      const response = await axios.put(`${API_URL}/${collection.toLowerCase()}s/${id}`, updatedItem);
       if (response.data) {
         // Find and update the item in the local state
         const index = data[collection].findIndex(item => item.id === id);
@@ -327,7 +336,7 @@ export const DataProvider = ({ children }) => {
     
     try {
       // Always delete directly from MongoDB
-      await axios.delete(`http://localhost:3004/${collection.toLowerCase()}s/${id}`);
+      await axios.delete(`${API_URL}/${collection.toLowerCase()}s/${id}`);
       
       // Remove from local state
       const updatedCollection = data[collection].filter(item => item.id !== id);
@@ -354,14 +363,52 @@ export const DataProvider = ({ children }) => {
     return filterFn ? items.filter(filterFn) : items;
   };
   
-  // Organization management
-  const addOrganization = (org) => {
-    // Ensure the organization has an empty subAdmins array
-    const newOrg = {
-      ...org,
-      subAdmins: org.subAdmins || []
-    };
-    return addItem('organizations', newOrg);
+  // Organization management - using dedicated endpoint
+  const addOrganization = async (formData) => {
+    try {
+      console.log('Form data received for organization creation:', formData);
+      
+      // Map the form fields to the correct organization structure
+      const orgData = {
+        id: uuidv4(), // Use UUID for consistent ID format
+        name: formData.name,
+        email: formData.contactEmail || '', // Map contactEmail from form to email field
+        phone: formData.contactPhone || '', // Map contactPhone from form to phone field
+        contactName: formData.contactName || '',
+        status: 'active'
+      };
+      
+      console.log('Sending organization data to dedicated endpoint:', orgData);
+      
+      // Use the dedicated endpoint for organization creation
+      const response = await axios.post(`${API_URL}/api/create-organization`, orgData);
+      
+      console.log('API response for organization creation:', response);
+      
+      if (response.data) {
+        console.log('Organization created successfully:', response.data);
+        
+        // Update local state with the newly created organization
+        setData(prevData => ({
+          ...prevData,
+          organizations: [...prevData.organizations, response.data]
+        }));
+        
+        // Also fetch all organizations to ensure state is up to date
+        fetchOrganizationsFromMongoDB().then(orgs => {
+          if (orgs && orgs.length > 0) {
+            setData(prevData => ({ ...prevData, organizations: orgs }));
+          }
+        });
+        
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error creating organization:', error);
+      alert(`Failed to create organization: ${error.message}. Please check the console for details.`);
+      return null;
+    }
   };
   
   const updateOrganization = (id, org) => {

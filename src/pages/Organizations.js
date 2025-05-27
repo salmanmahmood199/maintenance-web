@@ -65,17 +65,31 @@ const Organizations = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await addOrganization(formData);
-    setFormData({
-      name: '',
-      contactName: '',
-      contactEmail: '',
-      contactPhone: ''
-    });
-    // Refresh organizations after adding a new one
-    const updatedOrgs = await getOrganizations();
-    setOrganizations(updatedOrgs || []);
-    handleCloseDialog();
+    try {
+      console.log('Submitting organization data:', formData);
+      const newOrg = await addOrganization(formData);
+      
+      if (newOrg) {
+        console.log('Successfully created organization:', newOrg);
+        // Reset form
+        setFormData({
+          name: '',
+          contactName: '',
+          contactEmail: '',
+          contactPhone: ''
+        });
+        
+        // Add the new org to the local state instead of refetching all orgs
+        setOrganizations(prev => [...prev, newOrg]);
+        handleCloseDialog();
+      } else {
+        console.error('Failed to create organization - no data returned');
+        alert('Failed to create organization. Please check the console for details.');
+      }
+    } catch (error) {
+      console.error('Error in organization form submission:', error);
+      alert(`Error creating organization: ${error.message}`);
+    }
   };
 
   return (

@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     
     try {
       // Try to find user by email in MongoDB
-      const apiUrl = `http://localhost:3004/api/users/login`;
+      const apiUrl = `http://localhost:3008/users/login`;
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
       // For each role, get additional data if needed
       if (userData.role === 'subadmin') {
         // Get subAdmin data
-        const subAdminResponse = await fetch(`http://localhost:3004/api/subAdmins?email=${encodeURIComponent(email)}`);
+        const subAdminResponse = await fetch(`http://localhost:3008/subAdmins?email=${encodeURIComponent(email)}`);
         if (subAdminResponse.ok) {
           const subAdmins = await subAdminResponse.json();
           if (subAdmins && subAdmins.length > 0) {
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
       } 
       else if (userData.role === 'vendor') {
         // Get vendor data
-        const vendorResponse = await fetch(`http://localhost:3004/api/vendors?email=${encodeURIComponent(email)}`);
+        const vendorResponse = await fetch(`http://localhost:3008/vendors?email=${encodeURIComponent(email)}`);
         if (vendorResponse.ok) {
           const vendors = await vendorResponse.json();
           if (vendors && vendors.length > 0) {
@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }) => {
       } 
       else if (userData.role === 'technician') {
         // Get technician data
-        const techResponse = await fetch(`http://localhost:3004/api/technicians?email=${encodeURIComponent(email)}`);
+        const techResponse = await fetch(`http://localhost:3008/technicians?email=${encodeURIComponent(email)}`);
         if (techResponse.ok) {
           const technicians = await techResponse.json();
           if (technicians && technicians.length > 0) {
