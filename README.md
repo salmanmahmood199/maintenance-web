@@ -45,18 +45,28 @@ maintenance-web/
 - Node.js (v14 or later)
 - npm or yarn
 
-## MongoDB Setup
+## Project Setup
 
-This application uses MongoDB for data persistence. Follow these steps to set up the MongoDB connection:
+### Prerequisites
 
-1. Create a `.env` file in the root directory (use `.env.example` as a template)
-2. Add your MongoDB connection string to the `.env` file:
+- Node.js (v14 or later recommended)
+- npm or yarn
+- MongoDB: Ensure you have a MongoDB instance running. It typically runs on `mongodb://localhost:27017` by default.
+
+### Environment Configuration
+
+1. Create a `.env` file in the root directory of the project. You can copy `.env.example` to get started:
+   ```bash
+   cp .env.example .env
    ```
-   MONGODB_URI=mongodb+srv://<username>:<password>@<your-cluster-url>/<database-name>?retryWrites=true&w=majority
-   PORT=3004
+2. Edit the `.env` file and add your MongoDB connection string:
    ```
-3. Run the migration script to transfer data to MongoDB (if you have existing data):
+   MONGODB_URI=your_mongodb_connection_string_here (e.g., mongodb://localhost:27017/maintenance_web)
    ```
+   Replace `your_mongodb_connection_string_here` with your actual MongoDB connection URI. If you're running MongoDB locally without authentication, it might be `mongodb://localhost:27017/maintenance_web` (where `maintenance_web` is your database name).
+
+3. (Optional) If you have existing data in a `db.json` file and want to migrate it to MongoDB, you can run:
+   ```bash
    npm run migrate
    ```
 
@@ -64,18 +74,28 @@ This application uses MongoDB for data persistence. Follow these steps to set up
 
 In the project directory, you can run:
 
-### `npm start`
+### `npm start` (Frontend)
 
-Runs the app in the development mode.\
+Runs the React frontend development server.
+By default, it runs on port 3000. If that port is busy, it may prompt you to use another port.
+```bash
+npm start
+```
+Or, to specify port 3000 explicitly:
+```bash
+PORT=3000 npm start
+```
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+The page will reload when you make changes. You may also see any lint errors in the console.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### `npm run server:local` (Backend)
 
-### `npm run server:mongodb`
-
-Runs the MongoDB server on port 3004.\
-This serves as your backend API for the application.
+Runs the Node.js/Express backend API server.
+This server connects to MongoDB and provides the API endpoints for the frontend.
+It is configured to run on port 3001 (defined in `server-local.js`).
+```bash
+npm run server:local
+```
 
 ### `npm run migrate`
 
