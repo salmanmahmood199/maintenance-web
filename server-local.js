@@ -96,12 +96,27 @@ const createCrudRoutes = (app, modelName, Model) => {
     }
   });
   
+  // Get subadmin by email
+  app.get(`${path}/email/:email`, async (req, res) => {
+    try {
+      const { email } = req.params;
+      const subAdmin = await Model.findOne({ email });
+      if (!subAdmin) {
+        return handleResponse(res, [], 200);
+      }
+      handleResponse(res, [subAdmin]);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+
   // Get single item by ID
   app.get(`${path}/:id`, async (req, res) => {
     try {
-      const item = await Model.findOne({ id: req.params.id });
+      const { id } = req.params;
+      const item = await Model.findById(id);
       if (!item) {
-        return handleError(res, { message: `${modelName} not found` }, 404);
+        return handleResponse(res, null, 404);
       }
       handleResponse(res, item);
     } catch (error) {
@@ -112,14 +127,10 @@ const createCrudRoutes = (app, modelName, Model) => {
   // Create new item
   app.post(path, async (req, res) => {
     try {
-      console.log(`POST request to ${path}`, req.body);
-      const newItem = new Model(req.body);
-      console.log('Created model instance:', newItem);
-      const savedItem = await newItem.save();
-      console.log('Saved item:', savedItem);
+      const item = new Model(req.body);
+      const savedItem = await item.save();
       handleResponse(res, savedItem, 201);
     } catch (error) {
-      console.error(`Error saving ${modelName}:`, error);
       handleError(res, error);
     }
   });
@@ -127,17 +138,12 @@ const createCrudRoutes = (app, modelName, Model) => {
   // Update item
   app.put(`${path}/:id`, async (req, res) => {
     try {
-      const updatedItem = await Model.findOneAndUpdate(
-        { id: req.params.id },
-        req.body,
-        { new: true, runValidators: true }
-      );
-      
-      if (!updatedItem) {
-        return handleError(res, { message: `${modelName} not found` }, 404);
+      const { id } = req.params;
+      const item = await Model.findByIdAndUpdate(id, req.body, { new: true });
+      if (!item) {
+        return handleResponse(res, null, 404);
       }
-      
-      handleResponse(res, updatedItem);
+      handleResponse(res, item);
     } catch (error) {
       handleError(res, error);
     }

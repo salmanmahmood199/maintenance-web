@@ -216,15 +216,15 @@ const Vendors = () => {
           ...formData,
           id: editVendorId,
           // Keep email as is if no new password
-          email: formData.password.trim() === ''
-            ? formData.email 
-            : `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
+          // email: formData.password.trim() === ''
+          //   ? formData.email 
+          //   : `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
         };
       } else {
         // New vendor, always use timestamped email
         vendorData = {
           ...formData,
-          email: `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
+          // email: `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
         };
       }
       
