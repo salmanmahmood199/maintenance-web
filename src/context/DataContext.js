@@ -186,8 +186,15 @@ export const DataProvider = ({ children }) => {
   };
   
   const fetchVendorsFromMongoDB = async () => {
-    const result = await fetchFromMongoDB('vendors');
-    return result || [];
+    console.log('Fetching vendors from MongoDB...');
+    try {
+      const response = await axios.get(`${API_URL}/vendors`);
+      console.log('Vendors fetched successfully:', response.data);
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+      return [];
+    }
   };
   
   const fetchSubAdminsFromMongoDB = async () => {
@@ -450,7 +457,7 @@ export const DataProvider = ({ children }) => {
   };
   
   // Vendor management
-  const addVendor = (vendor) => {
+  const addVendor = async (vendor) => {
     // Validate email uniqueness
     if (!isEmailUnique(vendor.email)) {
       throw new Error('Email is already in use');
@@ -478,10 +485,14 @@ export const DataProvider = ({ children }) => {
       }
     }
     
+    // Important: Use the exact same email format for both vendor and user records
+    // The email in vendor object already includes the timestamp from the UI component
+    const vendorId = 'v' + Date.now();
+    
     const newVendor = {
-      id: 'v' + Date.now(),
+      id: vendorId,
       name: vendor.name,
-      email: vendor.email,
+      email: vendor.email, // This already has the timestamp from Vendors.js
       phone: vendor.phone,
       status: 'active',
       // Tier is no longer set during vendor creation
@@ -489,18 +500,45 @@ export const DataProvider = ({ children }) => {
       orgIds: vendor.orgIds
     };
     
-    // Add user record
-    addItem('users', {
-      id: uuidv4(),
-      email: vendor.email,
-      phone: vendor.phone,
-      password: vendor.password,
-      role: 'vendor',
-      orgContextIds: vendor.orgIds,
-      vendorId: newVendor.id
-    });
+    console.log('Creating vendor with data:', newVendor);
     
-    return addItem('vendors', newVendor);
+    // First create the vendor
+    const createdVendor = await addItem('vendors', newVendor);
+    
+    if (!createdVendor) {
+      throw new Error('Failed to create vendor record');
+    }
+    
+    console.log('Vendor created successfully:', createdVendor);
+    
+    // Then create the user with the EXACT same email
+    try {
+      console.log('Creating user account for vendor with email:', vendor.email);
+      
+      const userData = {
+        id: uuidv4(),
+        email: vendor.email, // Use the exact same email as the vendor
+        phone: vendor.phone,
+        password: vendor.password,
+        role: 'vendor',
+        orgContextIds: vendor.orgIds,
+        vendorId: vendorId
+      };
+      
+      const createdUser = await addItem('users', userData);
+      
+      if (!createdUser) {
+        console.error('Failed to create user record for vendor:', vendorId);
+        // Don't throw here - we already created the vendor, so return it
+      } else {
+        console.log('User account created successfully for vendor:', createdUser);
+      }
+    } catch (error) {
+      console.error('Error creating user account for vendor:', error);
+      // Continue and return the vendor even if user creation fails
+    }
+    
+    return createdVendor;
   };
   
   const updateVendor = (id, vendor) => {
@@ -1255,6 +1293,20 @@ const assignTicket = (id, vendorId) => {
 
   // Tier escalation has been removed - tiers are now only for access control
   
+  // User password reset by root
+  const rootResetUserPassword = async (userId, newPassword) => {
+    try {
+      const response = await axios.post(`/api/users/${userId}/set-password`, { newPassword });
+      console.log('Password reset successful:', response.data);
+      alert('Password has been successfully reset.'); // Or use a more sophisticated notification
+      return true;
+    } catch (error) {
+      console.error('Error resetting user password:', error.response ? error.response.data : error.message);
+      alert(`Error resetting password: ${error.response && error.response.data && error.response.data.message ? error.response.data.message : error.message}`);
+      return false;
+    }
+  };
+
   // Context value with all operations
   const value = {
     data,
@@ -1339,8 +1391,9 @@ const assignTicket = (id, vendorId) => {
     hasLocationAccess,
     hasTicketTierAccess,
     getAccessibleLocations,
-    
-    // Ticket Escalation
+    rootResetUserPassword,
+
+  // Ticket Escalation
     // shouldEscalateToTier1B removed - tiers are now only for access control
     systemConfig
   };

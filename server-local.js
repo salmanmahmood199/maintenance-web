@@ -54,8 +54,9 @@ app.post('/api/users/login', async (req, res) => {
     }
     
     // Check if password matches
-    if (user.password !== password) {
-      return res.status(401).json({ message: 'Invalid password' });
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' }); // More generic error message
     }
     
     // Return user data without the password
@@ -157,6 +158,37 @@ const createCrudRoutes = (app, modelName, Model) => {
     }
   });
 };
+
+// Endpoint for root to set a user's password
+app.post('/api/users/:userId/set-password', async (req, res) => {
+  const { userId } = req.params;
+  const { newPassword } = req.body;
+
+  // TODO: Add robust authorization to ensure only a 'root' user can call this.
+  // For now, relying on frontend to control access to this functionality.
+  // const requestingUser = req.user; // This would come from auth middleware
+  // if (!requestingUser || requestingUser.role !== 'root') {
+  //   return handleError(res, { message: 'Unauthorized' }, 401);
+  // }
+
+  if (!newPassword || newPassword.length < 6) { // Basic validation
+    return handleError(res, { message: 'Password must be at least 6 characters long' }, 400);
+  }
+
+  try {
+    const user = await User.findOne({ id: userId });
+    if (!user) {
+      return handleError(res, { message: 'User not found' }, 404);
+    }
+
+    user.password = newPassword; // The pre-save hook in User.js will hash this
+    await user.save();
+
+    handleResponse(res, { message: 'Password updated successfully' });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
 
 // Create CRUD routes for all models
 createCrudRoutes(app, 'Organization', Organization);

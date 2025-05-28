@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Box,
   Button,
@@ -43,12 +44,17 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
+
+// API URL for direct calls (same as in DataContext)
+const API_URL = 'http://localhost:3001';
 
 const Vendors = () => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
-  const { getVendors, addVendor, updateVendor, getOrganizations, getOrganization } = useData();
+  const { getVendors, addVendor, updateVendor, getOrganizations, getOrganization, getUsers, rootResetUserPassword, data: { users: allUsersFromContext } } = useData();
+  const { user: currentUser, loading: authLoading } = useAuth();
   
   // Check if we're in organization context
   const orgId = params.id;
@@ -74,6 +80,12 @@ const Vendors = () => {
   // Filter status state
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // State for password reset
+  const [allUsers, setAllUsers] = useState([]);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [selectedVendorForPasswordReset, setSelectedVendorForPasswordReset] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+
   // Fetch organizations when component mounts
   useEffect(() => {
     const fetchOrganizations = async () => {
@@ -88,6 +100,21 @@ const Vendors = () => {
     
     fetchOrganizations();
   }, [getOrganizations]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (currentUser && currentUser.role === 'root') {
+        const usersData = await getUsers(); // Assuming getUsers fetches and returns users
+        setAllUsers(usersData || []);
+      }
+    };
+    // If users are directly available in context and updated, use that
+    if (allUsersFromContext && currentUser && currentUser.role === 'root') {
+        setAllUsers(allUsersFromContext);
+    } else if (currentUser && currentUser.role === 'root') {
+        fetchUsers();
+    }
+  }, [getUsers, currentUser, allUsersFromContext]);
   
   useEffect(() => {
     // Update form data when organization context changes
@@ -246,19 +273,28 @@ const Vendors = () => {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        // Get vendors from API
-        const allVendors = await getVendors();
+        console.log('Fetching vendors from Vendors component...');
+        
+        // Direct API call to get vendors
+        const response = await axios.get(`${API_URL}/vendors`);
+        const allVendors = response.data;
+        
+        console.log('Vendors received from API:', allVendors);
         
         // Filter by organization if in org context
         const filteredByOrg = isOrgContext
           ? allVendors.filter(vendor => vendor.orgIds && Array.isArray(vendor.orgIds) && vendor.orgIds.includes(orgId))
           : allVendors;
         
+        console.log('Filtered by org context:', filteredByOrg);
+        
         // Apply status filter
         const filteredVendors = statusFilter === 'all'
           ? filteredByOrg
           : filteredByOrg.filter(vendor => (vendor.status || 'active') === statusFilter);
           
+        console.log('Final filtered vendors to display:', filteredVendors);
+        
         setVendors(filteredVendors || []);
       } catch (error) {
         console.error('Error fetching vendors:', error);
@@ -267,6 +303,15 @@ const Vendors = () => {
     };
     
     fetchVendors();
+    
+    // Set up an interval to refresh vendors every 10 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('Refreshing vendors list...');
+      fetchVendors();
+    }, 10000);
+    
+    // Clean up interval on unmount
+    return () => clearInterval(refreshInterval);
   }, [getVendors, isOrgContext, orgId, statusFilter]);
 
   // Helper to get organization names for a vendor
@@ -295,8 +340,85 @@ const Vendors = () => {
     return email;
   };
 
+  // Password Reset Dialog Handlers
+  const handleOpenResetPasswordDialog = (vendor) => {
+    setSelectedVendorForPasswordReset(vendor);
+    setNewPassword('');
+    setResetPasswordDialogOpen(true);
+  };
+
+  const handleCloseResetPasswordDialog = () => {
+    setResetPasswordDialogOpen(false);
+    setSelectedVendorForPasswordReset(null);
+    setNewPassword('');
+  };
+
+  const handleResetPasswordSubmit = async () => {
+    if (!selectedVendorForPasswordReset || !newPassword) {
+      alert('Vendor and new password are required.');
+      return;
+    }
+    if (newPassword.length < 6) {
+        alert('Password must be at least 6 characters long.');
+        return;
+    }
+
+    // Look for an existing user account for this vendor
+    const targetUser = allUsers.find(user => user.vendorId === selectedVendorForPasswordReset.id);
+
+    if (!targetUser) {
+      // No user account found - create a new one
+      const vendorId = selectedVendorForPasswordReset.id;
+      const vendorEmail = selectedVendorForPasswordReset.email;
+      console.log(`Creating missing user account for vendor: ${vendorId} with email: ${vendorEmail}`);
+
+      try {
+        // Use getUsers function to force a refresh of user data
+        await getUsers();
+        
+        // Create a new user record for this vendor
+        const newUserData = {
+          email: vendorEmail,
+          phone: selectedVendorForPasswordReset.phone || '',
+          password: newPassword,
+          role: 'vendor',
+          orgContextIds: selectedVendorForPasswordReset.orgIds || [],
+          vendorId: vendorId
+        };
+
+        // Try to create a new user - this will call the API endpoint
+        const response = await axios.post(`${API_URL}/users`, newUserData);
+        
+        if (response && response.data) {
+          console.log('Created new user account for vendor:', response.data);
+          alert('Created new user account and set password successfully.');
+          handleCloseResetPasswordDialog();
+        } else {
+          console.error('Failed to create user account for vendor');
+          alert('Failed to create user account. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error creating user account:', error);
+        alert(`Error creating user account: ${error.message}`);
+      }
+      return;
+    }
+
+    // If we found a user account, just reset the password
+    const success = await rootResetUserPassword(targetUser.id, newPassword);
+    if (success) {
+      handleCloseResetPasswordDialog();
+      alert('Password reset successfully.');
+    }
+  };
+
+  if (authLoading) {
+    return <Typography>Loading user...</Typography>; // Or a spinner component
+  }
+
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
+    <>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
       {/* Organization context title and breadcrumbs */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
         <Breadcrumbs sx={{ flexGrow: 1 }}>
@@ -433,15 +555,28 @@ const Vendors = () => {
                     {vendor.locationIds?.length ? vendor.locationIds.length : 'None assigned'}
                   </TableCell>
                   <TableCell align="right">
+                    {/* DEBUG START */}
+                    { console.log('Vendors Table - currentUser:', currentUser, 'isOrgContext:', isOrgContext, 'authLoading:', authLoading) }
+                    {/* DEBUG END */}
                     <Button 
+                      variant="outlined" 
                       size="small" 
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent row click from triggering
-                        handleOpenDialog(vendor);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); handleOpenDialog(vendor); }}
+                      sx={{ mr: 1 }}
                     >
-                      Manage
+                      Edit
                     </Button>
+                    {currentUser && currentUser.role === 'root' && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        color="warning"
+                        onClick={(e) => { e.stopPropagation(); handleOpenResetPasswordDialog(vendor); }}
+                        sx={{ mr: 1 }}
+                      >
+                        Reset Password
+                      </Button>
+                    )}
                     {!isOrgContext && (
                       <Button 
                         size="small" 
@@ -662,6 +797,35 @@ const Vendors = () => {
         </DialogActions>
       </Dialog>
     </Box>
+
+    {/* Password Reset Dialog */}
+    <Dialog open={resetPasswordDialogOpen} onClose={handleCloseResetPasswordDialog}>
+      <DialogTitle>Reset Password for {selectedVendorForPasswordReset?.name}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" gutterBottom>
+          Enter a new password for the user account associated with this vendor.
+        </Typography>
+        <TextField
+          autoFocus
+          margin="dense"
+          id="newPassword"
+          label="New Password"
+          type="password"
+          fullWidth
+          variant="standard"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          helperText="Password must be at least 6 characters long."
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleCloseResetPasswordDialog}>Cancel</Button>
+        <Button onClick={handleResetPasswordSubmit} variant="contained" color="primary">
+          Set New Password
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 };
 
