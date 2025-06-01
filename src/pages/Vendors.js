@@ -184,20 +184,17 @@ const Vendors = () => {
       let vendorData;
       
       if (editVendorId) {
-        // When editing, don't modify the email if password is empty (no change)
+        // When editing, don't modify the email
         vendorData = {
           ...formData,
           id: editVendorId,
-          // Keep email as is if no new password
-          email: formData.password.trim() === ''
-            ? formData.email 
-            : `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
+          email: formData.email // Use the email as entered without timestamp
         };
       } else {
-        // New vendor, always use timestamped email
+        // New vendor, use email as entered without timestamp
         vendorData = {
           ...formData,
-          email: `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
+          email: formData.email // Use the email as entered without timestamp
         };
       }
       

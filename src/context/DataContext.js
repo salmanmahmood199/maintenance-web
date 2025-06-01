@@ -434,8 +434,15 @@ export const DataProvider = ({ children }) => {
       }
     }
     
+    // Create a more user-friendly vendor ID using vendor name and a short random string
+    const vendorInitials = vendor.name.split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase();
+    const randomString = Math.random().toString(36).substring(2, 6);
+    
     const newVendor = {
-      id: 'v' + Date.now(),
+      id: `V-${vendorInitials}-${randomString}`,
       name: vendor.name,
       email: vendor.email,
       phone: vendor.phone,
