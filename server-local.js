@@ -114,7 +114,22 @@ const createCrudRoutes = (app, modelName, Model) => {
   app.get(`${path}/:id`, async (req, res) => {
     try {
       const { id } = req.params;
-      const item = await Model.findById(id);
+      // Try to find by MongoDB _id first, then by custom id field if not found
+      let item;
+      try {
+        // Only attempt findById if id looks like a valid MongoDB ObjectId
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          item = await Model.findById(id);
+        }
+      } catch (innerError) {
+        console.warn(`Error finding by _id, will try string id: ${innerError.message}`);
+      }
+
+      // If not found by _id, try the string 'id' field
+      if (!item) {
+        item = await Model.findOne({ id });
+      }
+      
       if (!item) {
         return handleResponse(res, null, 404);
       }

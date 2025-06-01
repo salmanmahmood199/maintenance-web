@@ -199,8 +199,15 @@ export const DataProvider = ({ children }) => {
   };
   
   const fetchSubAdminsFromMongoDB = async () => {
-    const result = await fetchFromMongoDB('subadmins');
-    return result || [];
+    try {
+      console.log('Fetching subadmins from MongoDB...');
+      const response = await axios.get(`${API_URL}/subadmins`);
+      console.log('SubAdmins fetched successfully:', response.data);
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching subadmins:', error);
+      return [];
+    }
   };
   
   const fetchLocationsFromMongoDB = async () => {

@@ -1,8 +1,10 @@
 /**
  * Script to seed MongoDB with sample data
  */
-// Set MongoDB URI to local database directly - no need for dotenv
-process.env.MONGODB_URI = 'mongodb+srv://salman:Salman1234@task-scout.mwxmqcg.mongodb.net/maintenance_web?retryWrites=true&w=majority';
+// Set MongoDB URI directly - no need for dotenv
+// Use Atlas MongoDB for production/staging or uncomment local MongoDB for development
+process.env.MONGODB_URI = 'mongodb+srv://salman:Salman1234@task-scout.mwxmqcg.mongodb.net/Task-Scout?retryWrites=true&w=majority';
+// process.env.MONGODB_URI = 'mongodb://localhost:27017/maintenance_web';
 const connectDB = require('./src/db/mongodb');
 const { v4: uuidv4 } = require('uuid');
 

@@ -210,47 +210,96 @@ const Vendors = () => {
       
       // Handle both new vendors and edits
       let vendorData;
+      let needsUserAccount = false;
       
       if (editVendorId) {
         // When editing, don't modify the email if password is empty (no change)
         vendorData = {
           ...formData,
           id: editVendorId,
-          // Keep email as is if no new password
-          // email: formData.password.trim() === ''
-          //   ? formData.email 
-          //   : `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
         };
+        
+        // Only create/update user account if password was provided
+        if (formData.password && formData.password.length > 0) {
+          needsUserAccount = true;
+        }
       } else {
         // New vendor, always use timestamped email
-        vendorData = {
-          ...formData,
-          // email: `${formData.email.split('@')[0]}+${Date.now()}@${formData.email.split('@')[1]}`
-        };
+        const timestamp = new Date().getTime();
+        const emailParts = formData.email.split('@');
+        if (emailParts.length === 2) {
+          const timestampedEmail = `${emailParts[0]}+${timestamp}@${emailParts[1]}`;
+          
+          // Generate a deterministic ID from email
+          const vendorId = `vendor-${timestamp}`;
+          
+          vendorData = {
+            ...formData,
+            id: vendorId,
+            email: timestampedEmail
+          };
+          
+          // Always create user account for new vendors
+          needsUserAccount = true;
+        } else {
+          alert('Please enter a valid email address.');
+          return;
+        }
       }
       
-      // In organization context, ensure the org ID is included
-      if (isOrgContext && (!vendorData.orgIds || !Array.isArray(vendorData.orgIds) || !vendorData.orgIds.includes(orgId))) {
-        vendorData.orgIds = [...vendorData.orgIds, orgId];
+      // Save the vendor
+      const savedVendor = editVendorId 
+        ? await updateVendor(vendorData) 
+        : await addVendor(vendorData);
+        
+      // Create or update corresponding User account for this vendor
+      if (needsUserAccount && formData.password && formData.password.length >= 6) {
+        try {
+          // Check if user account already exists for this vendor
+          const existingUser = allUsers.find(user => user.vendorId === vendorData.id);
+          
+          if (existingUser) {
+            // Update existing user account
+            console.log('Updating existing user account for vendor');
+            await axios.put(`${API_URL}/users/${existingUser.id}`, {
+              ...existingUser,
+              password: formData.password,
+              email: formData.email // Use cleaned email for user account
+            });
+          } else {
+            // Create new user account for this vendor
+            console.log('Creating new user account for vendor');
+            await axios.post(`${API_URL}/users`, {
+              id: `user-${new Date().getTime()}`,
+              email: formData.email, // Use cleaned email for user account
+              password: formData.password,
+              role: 'vendor',
+              vendorId: vendorData.id,
+              permissions: ['vendor.login', 'vendor.viewTickets'],
+              status: 'active'
+            });
+          }
+        } catch (userError) {
+          console.error('Error creating/updating user account for vendor:', userError);
+          // Continue despite user account error - the vendor was still created
+        }
+      } else if (needsUserAccount) {
+        alert('Password must be at least 6 characters long for vendor accounts.');
       }
+
+      // Refresh the vendors list
+      const response = await axios.get(`${API_URL}/vendors`);
+      const allVendors = response.data;
       
-      console.log('Saving vendor with data:', vendorData);
-    
-    // Use updateVendor when editing, addVendor when creating new
-    if (editVendorId) {
-      await updateVendor(editVendorId, vendorData);
-    } else {
-      await addVendor(vendorData);
-    }
-      
-      // Refresh both vendors and organizations data after adding or updating
-      const [allVendors, orgs] = await Promise.all([
-        getVendors(),
-        getOrganizations()
-      ]);
-      
-      // Update organizations state
+      // Refresh organizations too in case any were added
+      const orgs = await getOrganizations();
       setOrganizations(orgs || []);
+      
+      // Refresh users list if we're root
+      if (currentUser && currentUser.role === 'root') {
+        const usersData = await getUsers();
+        setAllUsers(usersData || []);
+      }
       
       // Filter vendors
       const filteredByOrg = isOrgContext
