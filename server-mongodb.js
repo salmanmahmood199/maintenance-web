@@ -29,6 +29,33 @@ app.get('/health', (req, res) => {
   res.json({ status: 'up' });
 });
 
+// Login endpoint
+app.post('/api/users/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Find the user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if password matches
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+    
+    // Return user data without the password
+    const userData = user.toObject();
+    delete userData.password;
+    
+    res.json(userData);
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Helper function to handle API responses
 const handleResponse = (res, data, statusCode = 200) => {
   return res.status(statusCode).json(data);
@@ -45,10 +72,27 @@ const handleError = (res, error, statusCode = 500) => {
 const createCrudRoutes = (app, modelName, Model) => {
   const path = `/${modelName.toLowerCase()}s`;
   
-  // Get all items
+  // Get all items with optional filtering
   app.get(path, async (req, res) => {
     try {
-      const items = await Model.find({});
+      // Support filtering by query parameters
+      const query = {};
+      
+      // Add supported filters
+      if (req.query.email) {
+        query.email = req.query.email;
+      }
+      
+      // Add other filters here as needed
+      if (req.query.id) {
+        query.id = req.query.id;
+      }
+      
+      if (req.query.name) {
+        query.name = { $regex: req.query.name, $options: 'i' };
+      }
+      
+      const items = await Model.find(query);
       handleResponse(res, items);
     } catch (error) {
       handleError(res, error);

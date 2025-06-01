@@ -72,10 +72,27 @@ const handleError = (res, error, statusCode = 500) => {
 const createCrudRoutes = (app, modelName, Model) => {
   const path = `/${modelName.toLowerCase()}s`;
   
-  // Get all items
+  // Get all items with optional filtering
   app.get(path, async (req, res) => {
     try {
-      const items = await Model.find({});
+      // Support filtering by query parameters
+      const query = {};
+      
+      // Add supported filters
+      if (req.query.email) {
+        query.email = req.query.email;
+      }
+      
+      // Add other filters here as needed
+      if (req.query.id) {
+        query.id = req.query.id;
+      }
+      
+      if (req.query.name) {
+        query.name = { $regex: req.query.name, $options: 'i' };
+      }
+      
+      const items = await Model.find(query);
       handleResponse(res, items);
     } catch (error) {
       handleError(res, error);
