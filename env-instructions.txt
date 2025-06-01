@@ -1,0 +1,6 @@
+# MongoDB Atlas Configuration
+# Copy these contents to a .env file (which you'll need to create manually)
+# Note: Username with @ symbol needs to be encoded
+MONGODB_URI=mongodb+srv://salman:Salman1234@task-scout.mwxmqcg.mongodb.net/Task-Scout?retryWrites=true&w=majority
+API_PORT=3001
+REACT_PORT=3000

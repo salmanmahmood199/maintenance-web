@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Technician",
+  "description": "Schema for technician data in the maintenance application",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the technician"
+    },
+    "name": {
+      "type": "string",
+      "description": "Full name of the technician"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email address of the technician (used for login)"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "vendorId": {
+      "type": "string",
+      "description": "ID of the vendor this technician is associated with"
+    },
+    "orgContextIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of organizations this technician is authorized to work for"
+    },
+    "specialties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of service specialties this technician is qualified for"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "on_call"],
+      "description": "Current status of the technician"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the technician record was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the technician record was last updated"
+    }
+  },
+  "required": ["id", "name", "email", "vendorId", "status", "createdAt", "updatedAt"],
+  "additionalProperties": false
+}

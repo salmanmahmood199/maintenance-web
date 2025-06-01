@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vendor",
+  "description": "Schema for vendor data in the maintenance application",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the vendor (UUID)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the vendor"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Primary contact email for the vendor"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Primary contact phone number"
+    },
+    "address": {
+      "type": "string",
+      "description": "Physical address of the vendor"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "pending"],
+      "description": "Current status of the vendor"
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of services provided by the vendor"
+    },
+    "tier": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "description": "Service tier level of the vendor (1-3)"
+    },
+    "orgContextIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs of organizations associated with this vendor"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the vendor was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the vendor was last updated"
+    }
+  },
+  "required": ["id", "name", "email", "status", "tier", "createdAt", "updatedAt"],
+  "additionalProperties": false
+}

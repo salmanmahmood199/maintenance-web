@@ -1,0 +1,1126 @@
+import React, { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Tabs,
+  Tab,
+  Paper,
+  Button,
+  IconButton,
+  Breadcrumbs,
+  Link,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  ListItemText,
+  FormHelperText,
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Rating,
+  Divider,
+  Checkbox,
+  Grid,
+  Tooltip
+} from '@mui/material';
+import {
+  ArrowBack as ArrowBackIcon,
+  Add as AddIcon,
+  Person as PersonIcon,
+  Security as SecurityIcon,
+  LocationOn as LocationIcon,
+  Build as VendorIcon,
+  AssignmentLate as TicketIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
+import { useData } from '../context/DataContext';
+
+// Tab Panel component
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`org-tabpanel-${index}`}
+      aria-labelledby={`org-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+const OrganizationDetailRevised = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { 
+    data,
+    getOrganization, 
+    getSubAdmins, 
+    getSecurityGroups,
+    getLocations,
+    getTickets,
+    getVendors,
+    addSubAdmin,
+    addLocation,
+    isEmailUnique,
+    isPhoneUnique,
+    isPasswordStrong
+  } = useData();
+
+  // User role templates with predefined permissions
+  const userRoleTemplates = [
+    {
+      name: 'Property Manager',
+      description: 'Can place and view tickets, manage locations',
+      permissions: ['subadmin.placeTicket', 'subadmin.viewTickets', 'subadmin.addLocation', 'subadmin.assignLocation']
+    },
+    {
+      name: 'Maintenance Coordinator',
+      description: 'Can place, accept and assign tickets to vendors',
+      permissions: ['subadmin.placeTicket', 'subadmin.viewTickets', 'subadmin.acceptTicket']
+    },
+    {
+      name: 'Vendor Manager',
+      description: 'Can manage vendors and their tiers',
+      permissions: ['subadmin.viewTickets', 'subadmin.manageVendors']
+    },
+    {
+      name: 'Accounting',
+      description: 'Can review and approve invoices',
+      permissions: ['subadmin.viewTickets', 'subadmin.acceptInvoice']
+    },
+    {
+      name: 'Custom Role',
+      description: 'Select individual permissions',
+      permissions: [] // No default permissions
+    }
+  ];
+  
+  // Fallback list of permissions in case data.availablePermissions is not available
+  const defaultPermissions = [
+    { id: 'subadmin.placeTicket', description: 'Create a new maintenance ticket: fill in location, issue type, description, upload media, and submit it.' },
+    { id: 'subadmin.acceptTicket', description: 'Pick up ("accept") an unassigned ticket at Tier 1: you see New tickets and can assign them to vendors.' },
+    { id: 'subadmin.tier2AcceptTicket', description: 'Accept or reassign tickets that have escalated past Tier 1 (i.e. Tier 2 queue).' },
+    { id: 'subadmin.tier3AcceptTicket', description: 'Accept or reassign tickets that have escalated past Tier 2 (i.e. Tier 3 queue).' },
+    { id: 'subadmin.addVendor', description: 'Add a new vendor record to the org: enter name, email, phone, password, and link them to one/multiple orgs.' },
+    { id: 'subadmin.addIssueType', description: 'Extend the "Type of Issue" lookup: add new categories like "Elevator" or "Electrical."' },
+    { id: 'subadmin.acceptInvoice', description: 'Review and approve a vendor-generated invoice before it goes to accounts payable.' },
+    { id: 'subadmin.addLocation', description: 'Create new locations (stores/sites) under the org: set name, address, contact info.' },
+    { id: 'subadmin.assignLocation', description: 'Assign users (managers or sub-admins) to one or more locations so they can place/see tickets there.' },
+    { id: 'subadmin.verifyJobCompleted', description: 'After a tech marks "Completed," verify the work order and close out the ticket.' },
+    { id: 'subadmin.viewTickets', description: 'View tickets in the system.' },
+    { id: 'subadmin.viewReports', description: 'Access and view reports.' },
+    { id: 'subadmin.manageVendors', description: 'Manage vendor tiers and status, but not create them.' }
+  ];
+  
+  // Get available permissions (from data or fallback)
+  const availablePermissions = data?.availablePermissions || defaultPermissions;
+
+  // State
+  const [tabValue, setTabValue] = useState(0);
+  const [subAdminDialog, setSubAdminDialog] = useState(false);
+  const [locationDialog, setLocationDialog] = useState(false);
+  const [vendorDialog, setVendorDialog] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState(null);
+  const [vendorForm, setVendorForm] = useState({
+    tier: 1,
+    status: 'active'
+  });
+  const [subAdminForm, setSubAdminForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    role: '',
+    permissions: []
+  });
+  const [locationForm, setLocationForm] = useState({
+    name: '',
+    address: ''
+  });
+  const [formErrors, setFormErrors] = useState({});
+
+  // Get organization data
+  const organization = getOrganization(id);
+  if (!organization) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error">Organization not found</Typography>
+        <Button 
+          startIcon={<ArrowBackIcon />} 
+          onClick={() => navigate('/organizations')}
+          sx={{ mt: 2 }}
+        >
+          Back to Organizations
+        </Button>
+      </Box>
+    );
+  }
+
+  // Get related data
+  const subAdmins = getSubAdmins(id);
+  const securityGroups = getSecurityGroups();
+  const locations = getLocations(id);
+  const tickets = getTickets();
+  const orgTickets = tickets.filter(ticket => {
+    const location = getLocations().find(loc => loc.id === ticket.locationId);
+    return location && location.orgId === id;
+  });
+  
+  // Get vendors assigned to this organization
+  const vendors = getVendors().filter(vendor => 
+    vendor.orgIds && vendor.orgIds.includes(id)
+  );
+
+  // Handle tab change
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  // Handle input change for the sub-admin form
+  const handleSubAdminInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    if (type === 'checkbox') {
+      // For checkboxes (permissions)
+      setSubAdminForm(prev => {
+        if (checked) {
+          return { ...prev, permissions: [...prev.permissions, value] };
+        } else {
+          return { ...prev, permissions: prev.permissions.filter(p => p !== value) };
+        }
+      });
+    } else if (name === 'role') {
+      // Handle role selection
+      const selectedRole = userRoleTemplates.find(role => role.name === value);
+      
+      if (selectedRole) {
+        // If not custom role, apply the template permissions
+        if (value !== 'Custom Role') {
+          setSubAdminForm(prev => ({ 
+            ...prev, 
+            role: value,
+            permissions: [...selectedRole.permissions]
+          }));
+        } else {
+          // For custom role, keep current permissions but set the role name
+          setSubAdminForm(prev => ({ 
+            ...prev, 
+            role: value
+          }));
+        }
+      } else {
+        // Just update the role name if no template found
+        setSubAdminForm(prev => ({ ...prev, [name]: value }));
+      }
+    } else {
+      // For regular inputs
+      setSubAdminForm(prev => ({ ...prev, [name]: value }));
+
+      // Clear any previous errors for this field
+      if (formErrors[name]) {
+        setFormErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[name];
+          return newErrors;
+        });
+      }
+    }
+  };
+
+  // Handle permission checkbox change
+  const handlePermissionChange = (e) => {
+    const { value, checked } = e.target;
+    
+    // When a role is selected, don't allow changing permissions directly
+    // except for 'Custom Role'
+    if (subAdminForm.role && subAdminForm.role !== 'Custom Role') {
+      return;
+    }
+    
+    setSubAdminForm(prev => {
+      if (checked) {
+        return {
+          ...prev,
+          permissions: [...prev.permissions, value]
+        };
+      } else {
+        return {
+          ...prev,
+          permissions: prev.permissions.filter(p => p !== value)
+        };
+      }
+    });
+  };
+
+  // Handle location form change
+  const handleLocationChange = (e) => {
+    const { name, value } = e.target;
+    setLocationForm(prev => ({ ...prev, [name]: value }));
+
+    // Clear any previous errors for this field
+    if (formErrors[name]) {
+      setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  // Validate sub-admin form
+  const validateSubAdminForm = () => {
+    const errors = {};
+
+    // Required fields
+    if (!subAdminForm.name) {
+      errors.name = 'Name is required';
+    }
+    
+    if (!subAdminForm.email) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(subAdminForm.email)) {
+      errors.email = 'Invalid email format';
+    } else if (!isEmailUnique(subAdminForm.email)) {
+      errors.email = 'Email is already taken';
+    }
+    
+    if (!subAdminForm.phone) {
+      errors.phone = 'Phone number is required';
+    } else if (!isPhoneUnique(subAdminForm.phone)) {
+      errors.phone = 'Phone number is already taken';
+    }
+    
+    if (!subAdminForm.password) {
+      errors.password = 'Password is required';
+    } else if (!isPasswordStrong(subAdminForm.password)) {
+      errors.password = 'Password must be at least 8 characters with at least one letter and one number';
+    }
+    
+    if (!subAdminForm.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (subAdminForm.password !== subAdminForm.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    
+    if (subAdminForm.permissions.length === 0) {
+      errors.permissions = 'At least one permission must be selected';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Validate location form
+  const validateLocationForm = () => {
+    const errors = {};
+
+    // Check required fields
+    if (!locationForm.name) errors.name = 'Location name is required';
+    if (!locationForm.address) errors.address = 'Address is required';
+
+    return errors;
+  };
+
+  // Submit sub-admin form
+  const handleSubAdminSubmit = () => {
+    if (!validateSubAdminForm()) {
+      return;
+    }
+    
+    try {
+      // Add sub-admin
+      addSubAdmin(id, {
+        name: subAdminForm.name,
+        email: subAdminForm.email,
+        phone: subAdminForm.phone,
+        password: subAdminForm.password,
+        permissions: subAdminForm.permissions
+      });
+      
+      // Close dialog and reset form
+      setSubAdminDialog(false);
+      setSubAdminForm({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        confirmPassword: '',
+        role: '',
+        permissions: []
+      });
+      setFormErrors({});
+      
+    } catch (error) {
+      setFormErrors({
+        ...formErrors,
+        submit: error.message
+      });
+    }
+  };
+
+  // Submit location form
+  const handleLocationSubmit = () => {
+    // Validate form
+    const errors = validateLocationForm();
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    try {
+      // Add location
+      addLocation({
+        name: locationForm.name,
+        address: locationForm.address,
+        orgId: id
+      });
+
+      // Reset form and close dialog
+      setLocationForm({
+        name: '',
+        address: ''
+      });
+      setFormErrors({});
+      setLocationDialog(false);
+    } catch (error) {
+      setFormErrors({ submit: error.message });
+    }
+  };
+
+  return (
+    <Box>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box>
+          <Breadcrumbs aria-label="breadcrumb">
+            <Link 
+              underline="hover" 
+              color="inherit" 
+              onClick={() => navigate('/organizations')}
+              sx={{ cursor: 'pointer' }}
+            >
+              Organizations
+            </Link>
+            <Typography color="text.primary">{organization.name}</Typography>
+          </Breadcrumbs>
+          <Typography variant="h4" component="h1" sx={{ mt: 1 }}>
+            {organization.name}
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            {organization.contactEmail} • {organization.contactPhone}
+          </Typography>
+        </Box>
+        <IconButton 
+          aria-label="back"
+          onClick={() => navigate('/organizations')}
+        >
+          <ArrowBackIcon />
+        </IconButton>
+      </Box>
+
+      {/* Tabs navigation */}
+      <Paper sx={{ width: '100%', mb: 2 }}>
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="organization tabs">
+          <Tab label="Sub-Admins" icon={<PersonIcon />} iconPosition="start" id="org-tab-0" aria-controls="org-tabpanel-0" />
+          <Tab label="Security Groups" icon={<SecurityIcon />} iconPosition="start" id="org-tab-1" aria-controls="org-tabpanel-1" />
+          <Tab label="Locations" icon={<LocationIcon />} iconPosition="start" id="org-tab-2" aria-controls="org-tabpanel-2" />
+          <Tab label="Vendors" icon={<VendorIcon />} iconPosition="start" id="org-tab-3" aria-controls="org-tabpanel-3" />
+          <Tab label="Tickets" icon={<TicketIcon />} iconPosition="start" id="org-tab-4" aria-controls="org-tabpanel-4" />
+        </Tabs>
+
+        {/* Sub-Admins Tab */}
+        <TabPanel value={tabValue} index={0}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Sub-Admins</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setSubAdminDialog(true)}
+            >
+              Add Sub-Admin
+            </Button>
+          </Box>
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Permissions</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {subAdmins.length > 0 ? (
+                  subAdmins.map((subAdmin) => (
+                    <TableRow key={subAdmin.id}>
+                      <TableCell>{subAdmin.name}</TableCell>
+                      <TableCell>{subAdmin.email}</TableCell>
+                      <TableCell>{subAdmin.phone}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {subAdmin.permissions && subAdmin.permissions.map(permId => (
+                            <Chip 
+                              key={permId} 
+                              label={permId.replace('subadmin.', '')} 
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              sx={{ mb: 0.5 }}
+                            />
+                          ))}
+                          {(!subAdmin.permissions || subAdmin.permissions.length === 0) && 
+                            'No permissions assigned'}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small" color="primary">
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" color="error">
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      No sub-admins found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
+        {/* Security Groups Tab */}
+        <TabPanel value={tabValue} index={1}>
+          <Typography variant="h6" gutterBottom>
+            Security Groups and Permissions
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            These roles determine what actions sub-admins can perform in the system.
+          </Typography>
+          <TableContainer component={Paper} sx={{ mt: 2 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Role</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Permissions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {securityGroups.map((group) => (
+                  <TableRow key={group.id}>
+                    <TableCell><strong>{group.name}</strong></TableCell>
+                    <TableCell>{group.description}</TableCell>
+                    <TableCell>
+                      {group.permissions && group.permissions.map(permission => (
+                        <Chip 
+                          key={permission} 
+                          label={permission.replace('subadmin.', '')} 
+                          size="small" 
+                          sx={{ mr: 0.5, mb: 0.5 }}
+                          color="primary"
+                          variant="outlined"
+                        />
+                      ))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
+        {/* Locations Tab */}
+        <TabPanel value={tabValue} index={2}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Locations</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setLocationDialog(true)}
+            >
+              Add Location
+            </Button>
+          </Box>
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Address</TableCell>
+                  <TableCell>Open Tickets</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {locations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center">
+                      No locations found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  locations.map((location) => {
+                    // Count open tickets for this location
+                    const openTickets = orgTickets.filter(
+                      t => t.locationId === location.id && 
+                      ['New', 'Assigned', 'In Progress', 'Paused'].includes(t.status)
+                    ).length;
+                    
+                    return (
+                      <TableRow key={location.id}>
+                        <TableCell>{location.name}</TableCell>
+                        <TableCell>{location.address}</TableCell>
+                        <TableCell>
+                          {openTickets > 0 ? (
+                            <Chip 
+                              label={`${openTickets} Open`} 
+                              color={openTickets > 5 ? 'error' : 'primary'} 
+                              size="small" 
+                            />
+                          ) : 'No open tickets'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
+        {/* Vendors Tab */}
+        <TabPanel value={tabValue} index={3}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Vendors
+            </Typography>
+            <Alert severity="info" sx={{ flexGrow: 1, ml: 2 }}>
+              Vendors are added at the system level. Here you can manage your vendor relationships by adjusting tiers or activation status.
+            </Alert>
+          </Box>
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Vendor Name</TableCell>
+                  <TableCell>Contact Info</TableCell>
+                  <TableCell>Tier</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {vendors.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      No vendors assigned to this organization
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  vendors.map((vendor) => (
+                    <TableRow key={vendor.id}>
+                      <TableCell><strong>{vendor.name}</strong></TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{vendor.email}</Typography>
+                        <Typography variant="body2" color="text.secondary">{vendor.phone}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={`Tier ${vendor.tier || 1}`} 
+                          color={vendor.tier === 3 ? 'error' : vendor.tier === 2 ? 'warning' : 'success'}
+                          size="small" 
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={vendor.status || 'Active'} 
+                          color={vendor.status === 'inactive' ? 'default' : 'primary'}
+                          variant={vendor.status === 'inactive' ? 'outlined' : 'filled'}
+                          size="small" 
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          size="small" 
+                          variant="outlined"
+                          onClick={() => {
+                            setSelectedVendor(vendor);
+                            setVendorForm({
+                              tier: vendor.tier || 1,
+                              status: vendor.status || 'active'
+                            });
+                            setVendorDialog(true);
+                          }}
+                        >
+                          Manage
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
+        {/* Tickets Tab */}
+        <TabPanel value={tabValue} index={4}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Tickets</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/create-ticket/' + id)}
+            >
+              Create Ticket
+            </Button>
+          </Box>
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Ticket #</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Location</TableCell>
+                  <TableCell>Issue Type</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Assigned Vendor</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {orgTickets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      No tickets found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  orgTickets.map((ticket) => {
+                    const location = getLocations().find(loc => loc.id === ticket.locationId);
+                    const vendor = ticket.assignedVendorId ? 
+                      getVendors().find(v => v.id === ticket.assignedVendorId) : null;
+                      
+                    return (
+                      <TableRow 
+                        key={ticket.id}
+                        hover
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => navigate(`/ticket/${ticket.id}`)}
+                      >
+                        <TableCell>{ticket.ticketNo}</TableCell>
+                        <TableCell>{new Date(ticket.dateTime).toLocaleDateString()}</TableCell>
+                        <TableCell>{location ? location.name : 'Unknown'}</TableCell>
+                        <TableCell>{ticket.issueType}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={ticket.status} 
+                            color={
+                              ticket.status === 'New' ? 'error' :
+                              ticket.status === 'Assigned' ? 'warning' :
+                              ticket.status === 'In Progress' ? 'info' :
+                              ticket.status === 'Completed' ? 'success' :
+                              ticket.status === 'Verified' ? 'secondary' :
+                              'default'
+                            } 
+                            size="small" 
+                          />
+                        </TableCell>
+                        <TableCell>{vendor ? vendor.name : 'Unassigned'}</TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="outlined" 
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/ticket/${ticket.id}`);
+                            }}
+                          >
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+      </Paper>
+
+      {/* Add Sub-Admin Dialog */}
+      <Dialog 
+        open={subAdminDialog} 
+        onClose={() => setSubAdminDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Sub-Admin</DialogTitle>
+        <DialogContent>
+          {formErrors.submit && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {formErrors.submit}
+            </Alert>
+          )}
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="name"
+            label="Full Name"
+            name="name"
+            value={subAdminForm.name}
+            onChange={handleSubAdminInputChange}
+            error={!!formErrors.name}
+            helperText={formErrors.name}
+          />
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="email"
+            label="Email Address"
+            name="email"
+            type="email"
+            value={subAdminForm.email}
+            onChange={handleSubAdminInputChange}
+            error={!!formErrors.email}
+            helperText={formErrors.email}
+          />
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="phone"
+            label="Phone Number"
+            name="phone"
+            value={subAdminForm.phone}
+            onChange={handleSubAdminInputChange}
+            error={!!formErrors.phone}
+            helperText={formErrors.phone}
+          />
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="password"
+            label="Password"
+            name="password"
+            type="password"
+            value={subAdminForm.password}
+            onChange={handleSubAdminInputChange}
+            error={!!formErrors.password}
+            helperText={formErrors.password || 'Must be at least 8 characters with at least one letter and one number'}
+          />
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="confirmPassword"
+            label="Confirm Password"
+            name="confirmPassword"
+            type="password"
+            value={subAdminForm.confirmPassword}
+            onChange={handleSubAdminInputChange}
+            error={!!formErrors.confirmPassword}
+            helperText={formErrors.confirmPassword}
+          />
+
+          <Box sx={{ mt: 3, mb: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              User Role
+            </Typography>
+
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="role-select-label">Role</InputLabel>
+              <Select
+                labelId="role-select-label"
+                id="role-select"
+                name="role"
+                value={subAdminForm.role}
+                onChange={handleSubAdminInputChange}
+                label="Role"
+              >
+                <MenuItem value=""><em>Select a role</em></MenuItem>
+                {userRoleTemplates.map((role) => (
+                  <MenuItem key={role.name} value={role.name}>
+                    <Box>
+                      <Typography variant="body1">{role.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">{role.description}</Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>
+                Select a predefined role or choose "Custom Role" to set individual permissions
+              </FormHelperText>
+            </FormControl>
+
+            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+              Permissions
+            </Typography>
+
+            {(subAdminForm.role === 'Custom Role' || !subAdminForm.role) && subAdminForm.permissions.length === 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Please select at least one permission
+              </Alert>
+            )}
+            
+            <Grid container spacing={1}>
+                  >
+                    <MenuItem value=""><em>Select a role</em></MenuItem>
+                    {userRoleTemplates.map((role) => (
+                      <MenuItem key={role.name} value={role.name}>
+                        <Box>
+                          <Typography variant="body1">{role.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{role.description}</Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>
+                    Select a predefined role or choose "Custom Role" to set individual permissions
+                  </FormHelperText>
+                </FormControl>
+
+                <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+                  Permissions
+                </Typography>
+
+                {(subAdminForm.role === 'Custom Role' || !subAdminForm.role) && subAdminForm.permissions.length === 0 && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Please select at least one permission
+                  </Alert>
+                )}
+                
+                <Grid container spacing={1}>
+                  {availablePermissions.map((permission) => (
+                    <Grid item xs={12} sm={6} key={permission.id}>
+                      <Box 
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          border: '1px solid #e0e0e0',
+                          borderRadius: 1,
+                          p: 1,
+                          mb: 1,
+                          bgcolor: subAdminForm.permissions.includes(permission.id) ? 'rgba(0, 0, 0, 0.04)' : 'transparent'
+                        }}
+                      >
+                        <Checkbox
+                          checked={subAdminForm.permissions.includes(permission.id)}
+                          onChange={handleSubAdminInputChange}
+                          value={permission.id}
+                          name="permissions"
+                          disabled={subAdminForm.role && subAdminForm.role !== 'Custom Role'}
+                        />
+                        <Box sx={{ ml: 1, flexGrow: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: subAdminForm.permissions.includes(permission.id) ? 'bold' : 'normal' }}>
+                            {permission.id.replace('subadmin.', '')}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap>
+                            {permission.description.length > 70 
+                              ? `${permission.description.substring(0, 70)}...` 
+                              : permission.description}
+                          </Typography>
+                        </Box>
+                        <Tooltip title={permission.description}>
+                          <IconButton size="small">
+                            <InfoIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Grid>
+                  ))}
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSubAdminDialog(false)}>Cancel</Button>
+          <Button onClick={handleSubAdminSubmit} variant="contained">
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Location Dialog */}
+      <Dialog 
+        open={locationDialog} 
+        onClose={() => setLocationDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Location</DialogTitle>
+        <DialogContent>
+          {formErrors.submit && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {formErrors.submit}
+            </Alert>
+          )}
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="name"
+            label="Location Name"
+            name="name"
+            value={locationForm.name}
+            onChange={handleLocationChange}
+            error={!!formErrors.name}
+            helperText={formErrors.name}
+          />
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="address"
+            label="Address"
+            name="address"
+            multiline
+            rows={3}
+            value={locationForm.address}
+            onChange={handleLocationChange}
+            error={!!formErrors.address}
+            helperText={formErrors.address}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLocationDialog(false)}>Cancel</Button>
+          <Button onClick={handleLocationSubmit} variant="contained">
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Manage Vendor Dialog */}
+      <Dialog
+        open={vendorDialog}
+        onClose={() => setVendorDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Manage Vendor Relationship</DialogTitle>
+        <DialogContent>
+          {selectedVendor && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6">{selectedVendor.name}</Typography>
+              <Typography variant="body2">{selectedVendor.email}</Typography>
+              <Typography variant="body2" color="text.secondary">{selectedVendor.phone}</Typography>
+              <Divider sx={{ my: 2 }} />
+            </Box>
+          )}
+
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="tier-label">Vendor Tier</InputLabel>
+            <Select
+              labelId="tier-label"
+              id="tier"
+              value={vendorForm.tier}
+              label="Vendor Tier"
+              onChange={(e) => setVendorForm(prev => ({ ...prev, tier: e.target.value }))}
+            >
+              <MenuItem value={1}>
+                <ListItemText
+                  primary="Tier 1 (Standard)"
+                  secondary="Regular maintenance and basic issues"
+                />
+              </MenuItem>
+              <MenuItem value={2}>
+                <ListItemText
+                  primary="Tier 2 (Advanced)"
+                  secondary="Complex repairs and specialty work"
+                />
+              </MenuItem>
+              <MenuItem value={3}>
+                <ListItemText
+                  primary="Tier 3 (Critical)"
+                  secondary="Emergency services and major systems"
+                />
+              </MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="status-label">Status</InputLabel>
+            <Select
+              labelId="status-label"
+              id="status"
+              value={vendorForm.status}
+              label="Status"
+              onChange={(e) => setVendorForm(prev => ({ ...prev, status: e.target.value }))}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive (Paused)</MenuItem>
+            </Select>
+            <FormHelperText>
+              {vendorForm.status === 'inactive' ? 
+                'Inactive vendors will not receive new ticket assignments' : 
+                'Active vendors can receive new ticket assignments'}
+            </FormHelperText>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setVendorDialog(false)}>Cancel</Button>
+          <Button 
+            onClick={() => {
+              // In a real app, we would update the vendor data here
+              console.log('Update vendor:', selectedVendor.id, vendorForm);
+              setVendorDialog(false);
+            }} 
+            variant="contained"
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default OrganizationDetailRevised;
