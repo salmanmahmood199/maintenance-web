@@ -188,8 +188,15 @@ export const DataProvider = ({ children }) => {
     return result || [];
   };
   
-  const fetchSubAdminsFromMongoDB = async () => {
-    const result = await fetchFromMongoDB('subadmins');
+  const fetchSubAdminsFromMongoDB = async (orgId = null) => {
+    let endpoint = 'subadmins';
+  
+    // If organization ID is provided, filter by it
+    if (orgId) {
+      endpoint = `subadmins/organization/${orgId}`;
+    }
+  
+    const result = await fetchFromMongoDB(endpoint);
     return result || [];
   };
   
@@ -348,8 +355,27 @@ export const DataProvider = ({ children }) => {
   };
   
   const getItem = (collection, id) => {
+    if (!id) return null;
     const items = Array.isArray(data[collection]) ? data[collection] : [];
-    return items.find(item => item.id === id);
+    
+    // Standard lookup by exact ID match - this is the primary way to find items
+    const exactMatch = items.find(item => item.id === id);
+    if (exactMatch) return exactMatch;
+    
+    // Only for vendors, do a case-insensitive ID match if exact match fails
+    // But DO NOT attempt to match by name - this was causing confusion
+    if (collection === 'vendors') {
+      const caseInsensitiveMatch = items.find(item => 
+        item.id && typeof item.id === 'string' && item.id.toLowerCase() === id.toLowerCase()
+      );
+      if (caseInsensitiveMatch) return caseInsensitiveMatch;
+      
+      console.log(`Vendor lookup failed for ID: ${id}. Available vendors:`, 
+        items.map(v => ({id: v.id, name: v.name}))
+      );
+    }
+    
+    return null;
   };
   
   const getItems = (collection, filterFn = null) => {

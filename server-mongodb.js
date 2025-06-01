@@ -92,6 +92,11 @@ const createCrudRoutes = (app, modelName, Model) => {
         query.name = { $regex: req.query.name, $options: 'i' };
       }
       
+      // Filter by organizationId - important for subadmins, locations, etc.
+      if (req.query.organizationId) {
+        query.organizationId = req.query.organizationId;
+      }
+      
       const items = await Model.find(query);
       handleResponse(res, items);
     } catch (error) {
@@ -227,6 +232,16 @@ app.get('/tickets/organization/:orgId', async (req, res) => {
     const tickets = await Ticket.find({ locationId: { $in: locationIds } });
     
     handleResponse(res, tickets);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Get subadmins by organization ID
+app.get('/subadmins/organization/:orgId', async (req, res) => {
+  try {
+    const subadmins = await SubAdmin.find({ organizationId: req.params.orgId });
+    handleResponse(res, subadmins);
   } catch (error) {
     handleError(res, error);
   }

@@ -101,8 +101,8 @@ const SubAdmins = () => {
         const orgs = await getOrganizations();
         setOrganizations(orgs || []);
         
-        // Fetch subAdmins
-        const admins = await getSubAdmins();
+        // Fetch subAdmins - filter by organization ID if in organization context
+        const admins = await getSubAdmins(isOrgContext ? orgId : null);
         setSubAdmins(admins || []);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -112,7 +112,7 @@ const SubAdmins = () => {
     };
     
     fetchData();
-  }, [getOrganizations, getSubAdmins]);
+  }, [getOrganizations, getSubAdmins, isOrgContext, orgId]);
   
   useEffect(() => {
     // Update form data when organization context changes
