@@ -273,7 +273,8 @@ export const DataProvider = ({ children }) => {
     
     try {
       // Always save directly to MongoDB
-      const response = await axios.post(`http://localhost:3004/${collection.toLowerCase()}s`, newItem);
+      const endpoint = collection.toLowerCase();
+      const response = await axios.post(`http://localhost:3004/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}`, newItem);
       if (response.data) {
         // Update local state with the newly created item from MongoDB
         setData({ ...data, [collection]: [...data[collection], response.data] });
@@ -296,7 +297,8 @@ export const DataProvider = ({ children }) => {
     
     try {
       // Always update directly in MongoDB
-      const response = await axios.put(`http://localhost:3004/${collection.toLowerCase()}s/${id}`, updatedItem);
+      const endpoint = collection.toLowerCase();
+      const response = await axios.put(`http://localhost:3004/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}/${id}`, updatedItem);
       if (response.data) {
         // Find and update the item in the local state
         const index = data[collection].findIndex(item => item.id === id);
@@ -327,7 +329,8 @@ export const DataProvider = ({ children }) => {
     
     try {
       // Always delete directly from MongoDB
-      await axios.delete(`http://localhost:3004/${collection.toLowerCase()}s/${id}`);
+      const endpoint = collection.toLowerCase();
+      await axios.delete(`http://localhost:3004/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}/${id}`);
       
       // Remove from local state
       const updatedCollection = data[collection].filter(item => item.id !== id);

@@ -25,7 +25,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   
   // Handle login
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     
@@ -35,14 +35,44 @@ const LoginPage = () => {
       return;
     }
     
-    // Attempt login
-    const success = login(email, password);
-    
-    if (success) {
-      // Navigate to intended destination
-      navigate(from, { replace: true });
-    } else {
-      setError('Invalid email or password. Please check your credentials and try again.');
+    try {
+      // Attempt login - this is an async operation
+      const success = await login(email, password);
+      
+      if (success) {
+        // Get the current user after login
+        const currentUser = JSON.parse(localStorage.getItem('maintenanceAppUser'));
+        console.log('Logged in user:', currentUser);
+        
+        // Navigate based on user role
+        if (currentUser && currentUser.role) {
+          switch (currentUser.role) {
+            case 'vendor':
+              // Redirect vendors to their specific page
+              navigate(`/vendors/${currentUser.vendorId}`, { replace: true });
+              break;
+            case 'subadmin':
+              // Redirect subadmins to their dashboard
+              navigate('/organizations', { replace: true });
+              break;
+            case 'technician':
+              // Redirect technicians to their specific page
+              navigate(`/technicians/${currentUser.technicianId}`, { replace: true });
+              break;
+            default:
+              // Default destination for admin and other roles
+              navigate(from, { replace: true });
+          }
+        } else {
+          // Fallback destination
+          navigate(from, { replace: true });
+        }
+      } else {
+        setError('Invalid email or password. Please check your credentials and try again.');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('An error occurred during login. Please try again.');
     }
   };
   
