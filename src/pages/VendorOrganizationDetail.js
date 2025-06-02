@@ -107,10 +107,15 @@ const VendorOrganizationDetail = () => {
   const fetchVendorTickets = useCallback(() => {
     const allTickets = getTickets();
     // Filter tickets for this organization that are assigned to this vendor
+    // using either vendorId or the legacy assignedVendorId field
     if (vendor) {
       const vendorTickets = allTickets.filter(ticket => {
         const location = getLocations().find(loc => loc.id === ticket.locationId);
-        return location && location.orgId === orgId && ticket.vendorId === vendor.id;
+        return (
+          location &&
+          location.orgId === orgId &&
+          (ticket.vendorId === vendor.id || ticket.assignedVendorId === vendor.id)
+        );
       });
       setTickets(vendorTickets);
     } else {

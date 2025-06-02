@@ -44,6 +44,9 @@ import {
 import { useData } from '../context/DataContext';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
+// Base URL for backend API
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3004';
+
 const SubAdmins = () => {
   const { 
     getSubAdmins, 
@@ -408,7 +411,7 @@ const SubAdmins = () => {
         const user = data.users.find(u => u.email === selectedSubAdmin.email);
         if (user) {
           // Use DataContext to update user password as well
-          await fetch(`http://localhost:3004/users/${user.id}`, {
+          await fetch(`${API_URL}/users/${user.id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',

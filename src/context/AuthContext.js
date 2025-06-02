@@ -3,6 +3,9 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 // Create context
 const AuthContext = createContext();
 
+// Base URL for backend API
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3004';
+
 // Auth provider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -35,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     
     try {
       // Try to find user by email in MongoDB
-      const apiUrl = `http://localhost:3004/api/users/login`;
+      const apiUrl = `${API_URL}/api/users/login`;
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -56,7 +59,7 @@ export const AuthProvider = ({ children }) => {
       // For each role, get additional data if needed
       if (userData.role === 'subadmin') {
         // Get subAdmin data
-        const subAdminResponse = await fetch(`http://localhost:3004/subadmins?email=${encodeURIComponent(email)}`);
+        const subAdminResponse = await fetch(`${API_URL}/subadmins?email=${encodeURIComponent(email)}`);
         if (subAdminResponse.ok) {
           const subAdmins = await subAdminResponse.json();
           if (subAdmins && subAdmins.length > 0) {
@@ -75,7 +78,7 @@ export const AuthProvider = ({ children }) => {
         try {
           // Get vendor data
           console.log('Fetching vendor data for:', email);
-          const vendorResponse = await fetch(`http://localhost:3004/vendors?email=${encodeURIComponent(email)}`);
+          const vendorResponse = await fetch(`${API_URL}/vendors?email=${encodeURIComponent(email)}`);
           
           if (vendorResponse.ok) {
             const vendors = await vendorResponse.json();
@@ -108,7 +111,7 @@ export const AuthProvider = ({ children }) => {
       } 
       else if (userData.role === 'technician') {
         // Get technician data
-        const techResponse = await fetch(`http://localhost:3004/technicians?email=${encodeURIComponent(email)}`);
+        const techResponse = await fetch(`${API_URL}/technicians?email=${encodeURIComponent(email)}`);
         if (techResponse.ok) {
           const technicians = await techResponse.json();
           if (technicians && technicians.length > 0) {

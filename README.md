@@ -54,6 +54,7 @@ This application uses MongoDB for data persistence. Follow these steps to set up
    ```
    MONGODB_URI=mongodb+srv://<username>:<password>@<your-cluster-url>/<database-name>?retryWrites=true&w=majority
    PORT=3004
+   REACT_APP_API_URL=http://localhost:3004
    ```
 3. Run the migration script to transfer data to MongoDB (if you have existing data):
    ```
