@@ -9,6 +9,9 @@ const DataContext = createContext();
 const isLocalStorageDisabled = true;
 console.log('localStorage disabled:', isLocalStorageDisabled);
 
+// Base URL for backend API
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3004';
+
 // System configuration
 const systemConfig = {
   // Time in milliseconds before a ticket escalates from Tier 1A to Tier 1B (24 hours)
@@ -169,7 +172,7 @@ export const DataProvider = ({ children }) => {
   const fetchFromMongoDB = async (endpoint) => {
     try {
       // Use direct server URL with port 3004 where MongoDB server is running
-      const response = await axios.get(`http://localhost:3004/${endpoint}`);
+      const response = await axios.get(`${API_URL}/${endpoint}`);
       console.log(`Fetched data from MongoDB (${endpoint}):`, response.data);
       return response.data;
     } catch (error) {
@@ -281,7 +284,7 @@ export const DataProvider = ({ children }) => {
     try {
       // Always save directly to MongoDB
       const endpoint = collection.toLowerCase();
-      const response = await axios.post(`http://localhost:3004/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}`, newItem);
+      const response = await axios.post(`${API_URL}/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}`, newItem);
       if (response.data) {
         // Update local state with the newly created item from MongoDB
         setData({ ...data, [collection]: [...data[collection], response.data] });
@@ -305,7 +308,7 @@ export const DataProvider = ({ children }) => {
     try {
       // Always update directly in MongoDB
       const endpoint = collection.toLowerCase();
-      const response = await axios.put(`http://localhost:3004/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}/${id}`, updatedItem);
+      const response = await axios.put(`${API_URL}/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}/${id}`, updatedItem);
       if (response.data) {
         // Find and update the item in the local state
         const index = data[collection].findIndex(item => item.id === id);
@@ -337,7 +340,7 @@ export const DataProvider = ({ children }) => {
     try {
       // Always delete directly from MongoDB
       const endpoint = collection.toLowerCase();
-      await axios.delete(`http://localhost:3004/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}/${id}`);
+      await axios.delete(`${API_URL}/${endpoint.endsWith('s') ? endpoint : endpoint + 's'}/${id}`);
       
       // Remove from local state
       const updatedCollection = data[collection].filter(item => item.id !== id);

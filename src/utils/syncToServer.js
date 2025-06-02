@@ -7,7 +7,7 @@
  */
 
 // MongoDB API URL
-const API_URL = 'http://localhost:3004';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3004';
 
 // Function to check if the MongoDB API server is running
 export const checkServerHealth = async () => {
