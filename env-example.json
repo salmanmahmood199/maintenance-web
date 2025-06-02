@@ -1,0 +1,10 @@
+{
+  "description": "Environment variables for the maintenance-web application. Copy these values to your .env file for local development.",
+  "variables": {
+    "MONGODB_URI": "mongodb+srv://salman:Salman1234@task-scout.mwxmqcg.mongodb.net/maintenance_web?retryWrites=true&w=majority",
+    "PORT": "3004",
+    "REACT_APP_API_URL": "http://localhost:3004"
+  },
+  "instructions": "For production, replace these values with appropriate production configurations and remove this file.",
+  "last_updated": "June 2, 2025"
+}
