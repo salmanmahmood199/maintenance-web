@@ -17,20 +17,24 @@ import { useData } from '../context/DataContext';
 const VendorOrganizationSelect = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getVendor, getOrganizations } = useData();
+  const { getVendors, getOrganizations } = useData();
   
-  // If user is a vendor, get their vendor details
-  // For demo, we'll assume the user is linked to a vendor via email
-  const vendors = user && user.role === 'vendor' 
-    ? [user.email].map(email => {
-        // Find vendor by email
-        const vendorList = getVendor(null, email);
-        return vendorList && vendorList.length > 0 ? vendorList[0] : null;
-      }).filter(Boolean)
-    : [];
-  
+  // Resolve vendor record directly from the user's vendorId
+  const vendor = user && user.role === 'vendor'
+    ? getVendors().find(v => v.id === user.vendorId)
+    : null;
+
+  if (user && user.role === 'vendor' && !vendor) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="body1" color="text.secondary">
+          Vendor record not found.
+        </Typography>
+      </Box>
+    );
+  }
+
   // Get assigned organizations
-  const vendor = vendors.length > 0 ? vendors[0] : null;
   const assignedOrgIds = vendor ? vendor.orgIds || [] : [];
   const organizations = getOrganizations().filter(org => assignedOrgIds.includes(org.id));
   

@@ -40,6 +40,7 @@ import {
   HelpOutline as RequestInfoIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
 // Tab Panel component
@@ -66,9 +67,9 @@ function TabPanel(props) {
 const VendorOrganizationDetail = () => {
   const { orgId } = useParams();
   const navigate = useNavigate();
-  const { 
-    getVendors,
-    getOrganization, 
+  const { user } = useAuth();
+  const {
+    getOrganization,
     getTechnicians,
     getLocations,
     getTickets,
@@ -128,24 +129,25 @@ const VendorOrganizationDetail = () => {
     // Get organization data
     const org = getOrganization(orgId);
     setOrganization(org);
-    
-    // Get vendor data
-    const foundVendor = getVendors().find(v => v.orgIds && v.orgIds.includes(orgId));
-    setVendor(foundVendor);
-    
+
+    // Resolve vendor by user.vendorId and verify it is linked to this organization
+    const vendorRecord = getVendor(user ? user.vendorId : null);
+    const linked = vendorRecord && vendorRecord.orgIds && vendorRecord.orgIds.includes(orgId);
+    setVendor(linked ? vendorRecord : null);
+
     // Get locations
     const locations = getLocations(orgId);
     setOrgLocations(locations);
-    
-    // Get technicians
-    const allTechs = getTechnicians(foundVendor ? foundVendor.id : null);
-    const techsForOrg = allTechs.filter(tech => 
+
+    // Get technicians for this vendor
+    const allTechs = linked ? getTechnicians(vendorRecord.id) : [];
+    const techsForOrg = allTechs.filter(tech =>
       tech.orgContextIds && tech.orgContextIds.includes(orgId)
     );
     setOrgTechnicians(techsForOrg);
-    
+
     // This will run after vendor state is updated in the next render
-  }, [orgId, getVendors, getOrganization, getTechnicians, getLocations]);
+  }, [orgId, user, getVendor, getOrganization, getTechnicians, getLocations]);
   
   // Effect for fetching tickets
   useEffect(() => {
@@ -157,8 +159,25 @@ const VendorOrganizationDetail = () => {
     return (
       <Box sx={{ p: 3 }}>
         <Typography color="error">Organization not found</Typography>
-        <Button 
-          startIcon={<ArrowBackIcon />} 
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/vendor-dashboard')}
+          sx={{ mt: 2 }}
+        >
+          Back to Organizations
+        </Button>
+      </Box>
+    );
+  }
+
+  if (!vendor) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error">
+          Vendor record not found or not linked to this organization
+        </Typography>
+        <Button
+          startIcon={<ArrowBackIcon />}
           onClick={() => navigate('/vendor-dashboard')}
           sx={{ mt: 2 }}
         >
