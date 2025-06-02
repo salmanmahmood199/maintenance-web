@@ -161,7 +161,7 @@ const Layout = ({ children }) => {
     <>
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => handleNavigate('/dashboard')}>
-          <img src="/images/byzpal-logo.svg" alt="BYZPAL" height="40" />
+          <Typography variant="h6" noWrap>Dashboard</Typography>
         </Box>
       </Toolbar>
       <Divider />
@@ -263,8 +263,7 @@ const Layout = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexGrow: 1 }} onClick={() => handleNavigate('/dashboard')}>
-            <img src="/images/byzpal-logo.svg" alt="BYZPAL" height="40" />
-            <Typography variant="h6" noWrap component="div" sx={{ ml: 1 }}>
+            <Typography variant="h6" noWrap component="div">
               {rootNavItems.find(item => location.pathname === item.path)?.text || 
                 (location.pathname.includes('/organizations/') ? 'Organization Details' : '')}
             </Typography>
