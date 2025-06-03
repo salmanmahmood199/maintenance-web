@@ -139,9 +139,11 @@ const VendorDetail = () => {
   const organizations = getOrganizations();
   const vendorOrgs = organizations.filter(org => vendor.orgIds.includes(org.id));
   
-  // Get tickets assigned to this vendor
+  // Get tickets assigned to this vendor - check both assignedVendorId and vendorId fields
   const allTickets = getTickets();
-  const vendorTickets = allTickets.filter(ticket => ticket.assignedVendorId === id);
+  const vendorTickets = allTickets.filter(ticket => 
+    ticket.assignedVendorId === id || ticket.vendorId === id
+  );
   
   // Function to get consistent color for organization
   const getOrgColor = (orgId) => {
