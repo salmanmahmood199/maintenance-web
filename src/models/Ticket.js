@@ -36,8 +36,9 @@ const TicketSchema = new mongoose.Schema({
     type: String,
     default: 'New'
   },
-  vendorId: String,
-  assignedVendorId: String, // Added to support backward compatibility with existing code
+  // vendorId is the primary field for vendor association
+  // NOTE: Some legacy data may use "assignedVendorId" which is now handled by frontend compatibility code
+  vendorId: String, // Added to support backward compatibility with existing code
   notes: [NoteSchema],
   mediaUrls: [String],
   adminApproved: {

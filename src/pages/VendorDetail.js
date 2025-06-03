@@ -212,30 +212,10 @@ const VendorDetail = () => {
   // Get tickets assigned to this vendor - check both assignedVendorId and vendorId fields
   const allTickets = getTickets();
   
-  // Debug log to see all tickets and their vendor assignments
-  console.log('All tickets count:', allTickets.length);
-  console.log('Current vendor ID:', id);
-  if (allTickets.length > 0) {
-    console.log('Sample ticket fields:', Object.keys(allTickets[0]));
-    console.log('Tickets with vendorId:', allTickets.filter(t => t.vendorId).length);
-    console.log('Tickets with assignedVendorId:', allTickets.filter(t => t.assignedVendorId).length);
-  }
-  
-  // More flexible ID comparison that handles different ID formats
-  const vendorTickets = allTickets.filter(ticket => {
-    // Check for direct match on either field
-    const directMatch = ticket.assignedVendorId === id || ticket.vendorId === id;
-    
-    // Log the comparison for debugging
-    if (ticket.vendorId) {
-      console.log(`Comparing: ticket.vendorId=${ticket.vendorId} with vendor.id=${id}, match=${ticket.vendorId === id}`);
-    }
-    
-    return directMatch;
-  });
-  
-  // Debug - log the tickets that matched
-  console.log(`Found ${vendorTickets.length} matching tickets for this vendor:`, vendorTickets);
+  // Filter tickets for this vendor - handles both vendorId and legacy assignedVendorId field
+  const vendorTickets = allTickets.filter(ticket => 
+    ticket.vendorId === id || ticket.assignedVendorId === id
+  );
   
   // Function to get consistent color for organization
   const getOrgColor = (orgId) => {
@@ -255,21 +235,13 @@ const VendorDetail = () => {
     };
   };
   
-  // Filter tickets by selected organization
+  // Filter tickets by selected organization - handles both orgId and organizationId fields
   const filteredTickets = selectedOrgId 
     ? vendorTickets.filter(ticket => 
         ticket.orgId === selectedOrgId || 
         ticket.organizationId === selectedOrgId
       )
     : vendorTickets;
-    
-  // Debug the tickets and their org IDs
-  console.log('Vendor tickets:', vendorTickets.map(t => ({ 
-    id: t.id, 
-    vendorId: t.vendorId,
-    orgId: t.orgId,
-    organizationId: t.organizationId
-  })));
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -784,15 +756,15 @@ const VendorDetail = () => {
                   </TableRow>
                 ) : (
                   filteredTickets.map((ticket) => {
-                    // Handle both orgId and organizationId fields
+                    // Get organization data using either orgId or organizationId
                     const org = organizations.find(o => 
                       o.id === ticket.orgId || o.id === ticket.organizationId
                     );
                     
-                    // Get location directly from locations collection
+                    // Get location data directly from locations collection
                     const location = locations.find(l => l.id === ticket.locationId);
                     
-                    // Get organization ID for color coding
+                    // Use consistent orgId for color coding and reference
                     const orgId = ticket.orgId || ticket.organizationId;
                     
                     return (
