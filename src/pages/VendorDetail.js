@@ -34,15 +34,50 @@ import {
   FormGroup,
   FormControlLabel,
   Divider,
-  Menu
+  Menu,
+  Drawer,
+  Grid,
+  Card,
+  CardContent,
+  Stepper,
+  Step,
+  StepLabel
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Add as AddIcon,
-  ArrowDropDown as ArrowDropDownIcon
+  ArrowDropDown as ArrowDropDownIcon,
+  Close as CloseIcon,
+  OpenInNew as OpenInNewIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+
+// Ticket workflow stages
+const TICKET_WORKFLOW = [
+  { key: 'created', label: 'Ticket Placed', description: 'Maintenance request submitted', status: 'New' },
+  { key: 'pending_approval', label: 'Pending Approval', description: 'Waiting for approval from admin', status: 'New' },
+  { key: 'assigned', label: 'Vendor Assigned', description: 'Ticket assigned to vendor', status: 'Assigned' },
+  { key: 'waiting_vendor_response', label: 'Awaiting Vendor Response', description: 'Waiting for vendor to accept, reject, or request more info', status: 'Assigned' },
+  { key: 'vendor_accepted', label: 'Vendor Accepted', description: 'Vendor accepted the ticket', status: 'Assigned' },
+  { key: 'vendor_rejected', label: 'Vendor Rejected', description: 'Vendor rejected the ticket', status: 'Rejected' },
+  { key: 'more_info_requested', label: 'More Info Requested', description: 'Vendor requested more information', status: 'More Info Needed' },
+  { key: 'work_order', label: 'Work Order Created', description: 'Vendor created work order', status: 'Assigned' },
+  { key: 'in_progress', label: 'Work In Progress', description: 'Vendor is working on the issue', status: 'In Progress' },
+  { key: 'invoice_uploaded', label: 'Invoice Uploaded', description: 'Work completed and invoice uploaded', status: 'Completed' },
+  { key: 'awaiting_approval', label: 'Awaiting Approval', description: 'Waiting for final approval', status: 'Completed' },
+  { key: 'completed', label: 'Order Complete', description: 'All work verified and completed', status: 'Verified' }
+];
+
+// Issue types
+const ISSUE_TYPES = [
+  { value: 'electrical', label: 'Electrical' },
+  { value: 'plumbing', label: 'Plumbing' },
+  { value: 'hvac', label: 'HVAC' },
+  { value: 'structural', label: 'Structural' },
+  { value: 'cleaning', label: 'Cleaning' },
+  { value: 'other', label: 'Other' }
+];
 
 // Tab Panel component
 function TabPanel(props) {
@@ -108,6 +143,9 @@ const VendorDetail = () => {
   const [ticketsFilterMenuAnchor, setTicketsFilterMenuAnchor] = useState(null);
   // State for technicians list - moved up from conditional position
   const [technicians, setTechnicians] = useState([]);
+  // State for selected ticket and drawer
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Load technicians when component mounts - moved up from conditional position
   useEffect(() => {
@@ -116,8 +154,35 @@ const VendorDetail = () => {
     }
   }, [id, getTechnicians]);
 
-  // Get vendor data
+  // Get vendor data and other data needed for ticket details
   const vendor = getVendor(id);
+  const { getLocations, getVendors } = useData();
+  const locations = getLocations();
+  
+  // Determine current step in ticket workflow
+  const determineCurrentStep = (ticket) => {
+    if (!ticket || !ticket.status) return 0;
+    
+    const status = ticket.status.toLowerCase();
+    const stepIndex = TICKET_WORKFLOW.findIndex(step => step.key === status || step.status === ticket.status);
+    return stepIndex >= 0 ? stepIndex : 0;
+  };
+  
+  // Get location name by ID
+  const getLocationName = (locationId) => {
+    if (!locationId) return '';
+    const location = locations.find(loc => loc.id === locationId);
+    return location ? location.name : '';
+  };
+  
+  // Get assigned vendor name
+  const getAssignedVendor = (ticket) => {
+    if (!ticket) return 'Unassigned';
+    const vendorId = ticket.vendorId || ticket.assignedVendorId;
+    if (!vendorId) return 'Unassigned';
+    const vendor = getVendors().find(v => v.id === vendorId);
+    return vendor ? vendor.name : 'Unknown Vendor';
+  };
   
   // Early return if vendor not found - now safe because all hooks are declared above
   if (!vendor) {
@@ -139,9 +204,16 @@ const VendorDetail = () => {
   const organizations = getOrganizations();
   const vendorOrgs = organizations.filter(org => vendor.orgIds.includes(org.id));
   
-  // Get tickets assigned to this vendor
+  // Get tickets assigned to this vendor - check both assignedVendorId and vendorId fields
   const allTickets = getTickets();
-  const vendorTickets = allTickets.filter(ticket => ticket.assignedVendorId === id);
+  const vendorTickets = allTickets.filter(ticket => 
+    ticket.assignedVendorId === id || ticket.vendorId === id
+  );
+  
+  // Log for debugging
+  console.log('All tickets count:', allTickets.length);
+  console.log('Vendor tickets count:', vendorTickets.length);
+  console.log('Vendor tickets:', vendorTickets);
   
   // Function to get consistent color for organization
   const getOrgColor = (orgId) => {
@@ -674,7 +746,10 @@ const VendorDetail = () => {
                           cursor: 'pointer',
                           '&:hover': { backgroundColor: 'action.hover' } 
                         }}
-                        onClick={() => navigate(`/tickets/${ticket.id}`)}
+                        onClick={() => {
+                          setSelectedTicket(ticket);
+                          setIsDrawerOpen(true);
+                        }}
                       >
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -985,6 +1060,132 @@ const VendorDetail = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Ticket Details Drawer */}
+      <Drawer
+        anchor="right"
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: '50%',
+            minWidth: 600,
+            p: 3,
+            overflowY: 'auto',
+          },
+        }}
+      >
+        {selectedTicket && (
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5" gutterBottom>
+                Ticket Details
+              </Typography>
+              <IconButton onClick={() => setIsDrawerOpen(false)}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            
+            <Divider sx={{ mb: 2 }} />
+            
+            {/* Ticket Progress Bar */}
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                  Ticket Progress
+                </Typography>
+                <Stepper activeStep={determineCurrentStep(selectedTicket)} orientation="vertical" sx={{ mt: 2 }}>
+                  {TICKET_WORKFLOW.map((step, index) => (
+                    <Step key={step.key} completed={index <= determineCurrentStep(selectedTicket)}>
+                      <StepLabel 
+                        optional={<Typography variant="caption">{step.description}</Typography>}
+                      >
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            fontWeight: index === determineCurrentStep(selectedTicket) ? 'bold' : 'normal',
+                            color: index === determineCurrentStep(selectedTicket) ? 'primary.main' : 'inherit'
+                          }}
+                        >
+                          {step.label}
+                        </Typography>
+                      </StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+              </CardContent>
+            </Card>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <Typography variant="subtitle2">Ticket #</Typography>
+                <Typography variant="body1" gutterBottom>{selectedTicket.ticketNo || selectedTicket.id}</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="subtitle2">Status</Typography>
+                <Chip 
+                  label={selectedTicket.status} 
+                  color={
+                    selectedTicket.status === 'completed' ? 'success' : 
+                    selectedTicket.status === 'in_progress' ? 'primary' : 
+                    selectedTicket.status === 'cancelled' ? 'error' : 'default'
+                  }
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">Date/Time</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {new Date(selectedTicket.dateTime || selectedTicket.createdAt).toLocaleString()}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">Location</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {getLocationName(selectedTicket.locationId) || 'Not specified'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">Issue Type</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {ISSUE_TYPES.find(type => type.value === selectedTicket.issueType)?.label || selectedTicket.issueType || 'Not specified'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">Description</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {selectedTicket.description || 'No description provided'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">Placed By</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {selectedTicket.placedBy || 'Unknown'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">Assigned To</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {getAssignedVendor(selectedTicket) || 'Unassigned'}
+                </Typography>
+              </Grid>
+            </Grid>
+            
+            <Divider sx={{ my: 2 }} />
+            
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button 
+                variant="outlined" 
+                onClick={() => navigate(`/tickets/${selectedTicket.id}`)}
+                startIcon={<OpenInNewIcon />}
+                sx={{ mt: 2 }}
+              >
+                Open Full Details
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </Drawer>
     </Box>
   );
 };

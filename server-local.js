@@ -139,12 +139,18 @@ const createCrudRoutes = (app, modelName, Model) => {
   app.put(`${path}/:id`, async (req, res) => {
     try {
       const { id } = req.params;
-      const item = await Model.findByIdAndUpdate(id, req.body, { new: true });
+      // Use findOneAndUpdate with the custom ID field instead of findByIdAndUpdate
+      const item = await Model.findOneAndUpdate(
+        { id: id }, // Find by the custom ID field
+        req.body, 
+        { new: true }
+      );
       if (!item) {
         return handleResponse(res, null, 404);
       }
       handleResponse(res, item);
     } catch (error) {
+      console.error('Error updating item:', error);
       handleError(res, error);
     }
   });

@@ -1322,7 +1322,7 @@ const Tickets = () => {
               <Grid item xs={12}>
                 <Typography variant="subtitle2">Assigned To</Typography>
                 <Typography variant="body1" gutterBottom>
-                  {getVendorName(selectedTicket.assignedVendorId)}
+                  {getAssignedVendor(selectedTicket)}
                 </Typography>
               </Grid>
             </Grid>

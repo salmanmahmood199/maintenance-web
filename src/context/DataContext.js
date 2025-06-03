@@ -312,7 +312,8 @@ export const DataProvider = ({ children }) => {
     
     try {
       // Always update directly in MongoDB
-      const response = await axios.put(`${API_URL}/${collection.toLowerCase()}s/${id}`, updatedItem);
+      // Use singular form for the collection name in the URL
+      const response = await axios.put(`${API_URL}/${collection.toLowerCase() !== 'tickets' ? collection.toLowerCase() + 's' : 'tickets'}/${id}`, updatedItem);
       if (response.data) {
         // Find and update the item in the local state
         const index = data[collection].findIndex(item => item.id === id);
