@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }) => {
       // Save user data to local storage
       localStorage.setItem('maintenanceAppUser', JSON.stringify(userData));
       setUser(userData);
-      return true;
+      return userData;
     } catch (error) {
       console.log('Login error:', error);
       return false;

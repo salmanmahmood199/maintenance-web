@@ -17,7 +17,6 @@ const LoginPage = () => {
   const { login } = useAuth();
   
   // Default redirect path
-  const from = location.state?.from?.pathname || '/dashboard';
   
   // Form state
   const [email, setEmail] = useState('');
@@ -25,7 +24,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   
   // Handle login
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     
@@ -36,11 +35,15 @@ const LoginPage = () => {
     }
     
     // Attempt login
-    const success = login(email, password);
-    
-    if (success) {
+    const user = await login(email, password);
+    if (user) {
       // Navigate to intended destination
-      navigate(from, { replace: true });
+  var from = location.state?.from?.pathname || '/dashboard';
+  if(user?.role == 'vendor') {
+    from = '/vendors/'+user?.vendorId;
+  }
+  console.log(from, user.role)
+  navigate(from, { replace: true });
     } else {
       setError('Invalid email or password. Please check your credentials and try again.');
     }
