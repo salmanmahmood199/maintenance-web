@@ -1,47 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
+import { 
   Box,
+  Container,
   Typography,
+  Button,
   Tabs,
   Tab,
+  Divider,
+  Chip,
+  Avatar,
   Paper,
-  Button,
+  Grid,
   IconButton,
-  Breadcrumbs,
-  Link,
+  Menu,
+  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  FormControlLabel,
   Checkbox,
-  ListItemText,
-  OutlinedInput,
   Alert,
-  FormHelperText,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   FormGroup,
-  FormControlLabel,
-  Divider,
-  Menu
+  Stepper,
+  Step,
+  StepLabel,
+  Drawer,
+  Breadcrumbs,
+  Link,
+  FormControl,
+  InputLabel,
+  Select,
+  OutlinedInput,
+  ListItemText,
+  FormHelperText
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Add as AddIcon,
-  ArrowDropDown as ArrowDropDownIcon
+  ArrowDropDown as ArrowDropDownIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 
 // Tab Panel component
@@ -76,7 +85,8 @@ const VendorDetail = () => {
     isEmailUnique,
     isPhoneUnique,
     isPasswordStrong,
-    getTickets
+    getTickets,
+    refreshData
   } = useData();
 
   // State - ALL useState hooks need to be at the top level before any conditionals
@@ -108,6 +118,9 @@ const VendorDetail = () => {
   const [ticketsFilterMenuAnchor, setTicketsFilterMenuAnchor] = useState(null);
   // State for technicians list - moved up from conditional position
   const [technicians, setTechnicians] = useState([]);
+  // State for ticket details drawer
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
   // Load technicians when component mounts - moved up from conditional position
   useEffect(() => {
@@ -118,6 +131,45 @@ const VendorDetail = () => {
 
   // Get vendor data
   const vendor = getVendor(id);
+  const { getLocations, getVendors } = useData();
+  const locations = getLocations();
+  
+  // Determine current step in ticket workflow
+  const determineCurrentStep = (ticket) => {
+    if (!ticket || !ticket.status) return 0;
+    
+    const status = ticket.status.toLowerCase();
+    // Define workflow steps similar to Habeeb's implementation
+    const TICKET_WORKFLOW = [
+      { key: 'new', label: 'New', description: 'Ticket created', status: 'New' },
+      { key: 'assigned', label: 'Assigned', description: 'Assigned to vendor', status: 'Assigned' },
+      { key: 'in_progress', label: 'In Progress', description: 'Work in progress', status: 'In Progress' },
+      { key: 'completed', label: 'Completed', description: 'Work completed', status: 'Completed' },
+      { key: 'verified', label: 'Verified', description: 'Work verified', status: 'Verified' }
+    ];
+    
+    const stepIndex = TICKET_WORKFLOW.findIndex(step => 
+      step.key === status || 
+      step.status.toLowerCase() === status
+    );
+    return stepIndex >= 0 ? stepIndex : 0;
+  };
+  
+  // Get location name by ID
+  const getLocationName = (locationId) => {
+    if (!locationId) return '';
+    const location = locations.find(loc => loc.id === locationId);
+    return location ? location.name : '';
+  };
+  
+  // Get assigned vendor name
+  const getAssignedVendor = (ticket) => {
+    if (!ticket) return 'Unassigned';
+    const vendorId = ticket.vendorId || ticket.assignedVendorId;
+    if (!vendorId) return 'Unassigned';
+    const assignedVendor = getVendors().find(v => v.id === vendorId);
+    return assignedVendor ? assignedVendor.name : 'Unknown Vendor';
+  };
   
   // Early return if vendor not found - now safe because all hooks are declared above
   if (!vendor) {
@@ -139,11 +191,51 @@ const VendorDetail = () => {
   const organizations = getOrganizations();
   const vendorOrgs = organizations.filter(org => vendor.orgIds.includes(org.id));
   
+  // Function to refresh data
+  const handleRefreshData = async () => {
+    console.log('Refreshing vendor data...');
+    console.log('Current vendor ID:', id);
+    await refreshData();
+    
+    // After refresh, log the tickets for debugging
+    const refreshedTickets = getTickets();
+    console.log('All tickets after refresh:', refreshedTickets);
+    console.log('TICK-2873 ticket:', refreshedTickets.find(t => t.ticketNo === 'TICK-2873'));
+    
+    // Check if the vendor can see the ticket
+    const vendorVisibleTickets = refreshedTickets.filter(ticket => 
+      ticket.assignedVendorId === id || ticket.vendorId === id
+    );
+    console.log('Vendor visible tickets:', vendorVisibleTickets);
+  };
+  
   // Get tickets assigned to this vendor - check both assignedVendorId and vendorId fields
   const allTickets = getTickets();
-  const vendorTickets = allTickets.filter(ticket => 
-    ticket.assignedVendorId === id || ticket.vendorId === id
-  );
+  
+  // Debug log to see all tickets and their vendor assignments
+  console.log('All tickets count:', allTickets.length);
+  console.log('Current vendor ID:', id);
+  if (allTickets.length > 0) {
+    console.log('Sample ticket fields:', Object.keys(allTickets[0]));
+    console.log('Tickets with vendorId:', allTickets.filter(t => t.vendorId).length);
+    console.log('Tickets with assignedVendorId:', allTickets.filter(t => t.assignedVendorId).length);
+  }
+  
+  // More flexible ID comparison that handles different ID formats
+  const vendorTickets = allTickets.filter(ticket => {
+    // Check for direct match on either field
+    const directMatch = ticket.assignedVendorId === id || ticket.vendorId === id;
+    
+    // Log the comparison for debugging
+    if (ticket.vendorId) {
+      console.log(`Comparing: ticket.vendorId=${ticket.vendorId} with vendor.id=${id}, match=${ticket.vendorId === id}`);
+    }
+    
+    return directMatch;
+  });
+  
+  // Debug - log the tickets that matched
+  console.log(`Found ${vendorTickets.length} matching tickets for this vendor:`, vendorTickets);
   
   // Function to get consistent color for organization
   const getOrgColor = (orgId) => {
@@ -165,8 +257,19 @@ const VendorDetail = () => {
   
   // Filter tickets by selected organization
   const filteredTickets = selectedOrgId 
-    ? vendorTickets.filter(ticket => ticket.orgId === selectedOrgId)
+    ? vendorTickets.filter(ticket => 
+        ticket.orgId === selectedOrgId || 
+        ticket.organizationId === selectedOrgId
+      )
     : vendorTickets;
+    
+  // Debug the tickets and their org IDs
+  console.log('Vendor tickets:', vendorTickets.map(t => ({ 
+    id: t.id, 
+    vendorId: t.vendorId,
+    orgId: t.orgId,
+    organizationId: t.organizationId
+  })));
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -596,7 +699,14 @@ const VendorDetail = () => {
                 ? `Filter: ${organizations.find(o => o.id === selectedOrgId)?.name}` 
                 : "Filter by Organization"}
             </Button>
-            
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefreshData}
+              sx={{ ml: 1 }}
+            >
+              Refresh Tickets
+            </Button>
             {selectedOrgId && (
               <Button 
                 variant="outlined" 
@@ -660,39 +770,66 @@ const VendorDetail = () => {
                 {filteredTickets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} align="center">
-                      No tickets are currently assigned to this vendor
+                      <Box sx={{ p: 2 }}>
+                        <Typography variant="body1" gutterBottom>
+                          No tickets found for this vendor.
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {vendorTickets.length > 0 ? 
+                            "Try clearing any organization filters to see all tickets." : 
+                            "This vendor doesn't have any tickets assigned yet."}
+                        </Typography>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredTickets.map((ticket) => {
-                    const org = organizations.find(o => o.id === ticket.orgId);
-                    const location = org?.locations?.find(l => l.id === ticket.locationId);
+                    // Handle both orgId and organizationId fields
+                    const org = organizations.find(o => 
+                      o.id === ticket.orgId || o.id === ticket.organizationId
+                    );
+                    
+                    // Get location directly from locations collection
+                    const location = locations.find(l => l.id === ticket.locationId);
+                    
+                    // Get organization ID for color coding
+                    const orgId = ticket.orgId || ticket.organizationId;
                     
                     return (
                       <TableRow 
                         key={ticket.id}
-                        hover
-                        sx={{ 
-                          cursor: 'pointer',
-                          '&:hover': { backgroundColor: 'action.hover' } 
+                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                        onClick={() => {
+                          setSelectedTicket(ticket);
+                          setIsDrawerOpen(true);
+                          console.log('Selected ticket:', ticket);
                         }}
-                        onClick={() => navigate(`/tickets/${ticket.id}`)}
+                        style={{ cursor: 'pointer' }}
                       >
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <AssignmentIcon color="primary" sx={{ mr: 1 }} />
-                            {ticket.id.slice(0, 8)}
+                            {ticket.id}
                           </Box>
                         </TableCell>
-                        <TableCell>{ticket.title}</TableCell>
+                        <TableCell>
+                          <Box>
+                            <Typography variant="body2" fontWeight="bold">
+                              {ticket.ticketNo || `Ticket ${ticket.id.substring(4, 8)}`}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ticket.description || ticket.issueType || 'No description'}
+                            </Typography>
+                          </Box>
+                        </TableCell>
                         <TableCell>
                           <Chip 
                             label={org?.name || 'Unknown'} 
                             size="small"
                             sx={{
-                              backgroundColor: getOrgColor(ticket.orgId).bg,
+                              backgroundColor: getOrgColor(orgId).bg,
                               border: '1px solid',
-                              borderColor: getOrgColor(ticket.orgId).border
+                              borderColor: getOrgColor(orgId).border
                             }}
                           />
                         </TableCell>
@@ -987,6 +1124,126 @@ const VendorDetail = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Ticket Details Drawer */}
+      <Drawer
+        anchor="right"
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        sx={{
+          '& .MuiDrawer-paper': { width: { xs: '100%', sm: '60%', md: '50%', lg: '40%' } },
+        }}
+      >
+        {selectedTicket && (
+          <Box sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5" component="h2">
+                Ticket Details
+              </Typography>
+              <IconButton onClick={() => setIsDrawerOpen(false)}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            
+            <Divider sx={{ mb: 2 }} />
+            
+            {/* Ticket Title & ID */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                {selectedTicket.title || selectedTicket.description?.substring(0, 50) || 'Untitled Ticket'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                ID: {selectedTicket.id}
+              </Typography>
+            </Box>
+            
+            {/* Ticket Status with color */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" component="span" sx={{ mr: 1 }}>
+                Status:
+              </Typography>
+              <Chip 
+                label={selectedTicket.status || 'Unknown'} 
+                color={
+                  selectedTicket.status?.toLowerCase() === 'completed' ? 'success' :
+                  selectedTicket.status?.toLowerCase() === 'in progress' ? 'warning' :
+                  selectedTicket.status?.toLowerCase() === 'open' ? 'info' : 'default'
+                }
+                size="small"
+              />
+            </Box>
+            
+            {/* Ticket Details in a grid */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2">Priority:</Typography>
+                <Typography variant="body2">{selectedTicket.priority || 'Not set'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2">Location:</Typography>
+                <Typography variant="body2">{getLocationName(selectedTicket.locationId) || 'Unknown'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2">Assigned Vendor:</Typography>
+                <Typography variant="body2">{getAssignedVendor(selectedTicket)}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle2">Created:</Typography>
+                <Typography variant="body2">
+                  {selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleString() : 'Unknown'}
+                </Typography>
+              </Grid>
+            </Grid>
+            
+            {/* Description */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom>Description:</Typography>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="body2">
+                  {selectedTicket.description || 'No description provided'}
+                </Typography>
+              </Paper>
+            </Box>
+            
+            {/* Ticket Workflow */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom>Workflow Progress:</Typography>
+              <Stepper activeStep={determineCurrentStep(selectedTicket)} alternativeLabel>
+                <Step key="new">
+                  <StepLabel>New</StepLabel>
+                </Step>
+                <Step key="assigned">
+                  <StepLabel>Assigned</StepLabel>
+                </Step>
+                <Step key="in_progress">
+                  <StepLabel>In Progress</StepLabel>
+                </Step>
+                <Step key="completed">
+                  <StepLabel>Completed</StepLabel>
+                </Step>
+                <Step key="verified">
+                  <StepLabel>Verified</StepLabel>
+                </Step>
+              </Stepper>
+            </Box>
+            
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+              <Button 
+                variant="contained" 
+                color="primary"
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  navigate(`/tickets/${selectedTicket.id}`);
+                }}
+              >
+                View Full Details
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </Drawer>
+      
     </Box>
   );
 };

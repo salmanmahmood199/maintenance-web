@@ -16,8 +16,16 @@ const User = require('./src/models/User');
 const app = express();
 const port = process.env.PORT || 3004;
 
-// Connect to MongoDB
-connectDB();
+// Get MongoDB URI and update database name
+const MONGODB_URI = process.env.MONGODB_URI.replace('main', 'maintenance_web');
+console.log('Using Database: maintenance_web');
+
+// MongoDB Connection
+mongoose
+  .connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
 
 // Middleware
 app.use(cors());

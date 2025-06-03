@@ -37,6 +37,7 @@ const TicketSchema = new mongoose.Schema({
     default: 'New'
   },
   vendorId: String,
+  assignedVendorId: String, // Added to support backward compatibility with existing code
   notes: [NoteSchema],
   mediaUrls: [String],
   adminApproved: {
