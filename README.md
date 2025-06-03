@@ -47,16 +47,37 @@ maintenance-web/
 
 ## MongoDB Setup
 
-This application uses MongoDB for data persistence. Follow these steps to set up the MongoDB connection:
+This application uses MongoDB for data persistence. **IMPORTANT: The application specifically requires the `maintenance_web` database.**
 
-1. Create a `.env` file in the root directory (use `.env.example` as a template)
-2. Add your MongoDB connection string to the `.env` file:
-   ```
-   MONGODB_URI=mongodb+srv://<username>:<password>@<your-cluster-url>/<database-name>?retryWrites=true&w=majority
-   PORT=3004
-   REACT_APP_API_URL=http://localhost:3004
-   ```
-3. Run the migration script to transfer data to MongoDB (if you have existing data):
+### Database Configuration
+
+1. The application connects to the MongoDB 'maintenance_web' database
+2. All ticket and vendor data is stored in this database
+3. The database connection string is configured through environment variables
+
+### Environment Setup
+
+1. Create a `.env` file in the root directory
+2. Add the following environment variables:
+
+```
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/maintenance_web
+PORT=3004
+REACT_APP_API_URL=http://localhost:3004
+```
+
+3. Replace `<username>`, `<password>`, and `<cluster>` with your MongoDB credentials
+4. **Note:** The database name should be set to `maintenance_web` in the connection string
+
+### Connection Details
+
+- **Backend API Port**: 3004 (configured via PORT env variable)
+- **Database**: maintenance_web
+- **Frontend Development Server**: http://localhost:3000
+
+### Additional Steps
+
+1. Run the migration script to transfer data to MongoDB (if you have existing data):
    ```
    npm run migrate
    ```
