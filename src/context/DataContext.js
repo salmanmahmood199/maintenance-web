@@ -843,7 +843,7 @@ const assignTicket = (id, vendorId) => {
     // Update ticket with vendor acceptance
     updateTicket(id, {
       ...ticket,
-      status: 'In Progress',
+      status: 'Assigned',
       currentStep: 'vendor_accepted',
       workOrders: [
         ...(ticket.workOrders || []),

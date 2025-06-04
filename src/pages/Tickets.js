@@ -45,7 +45,10 @@ import {
   Pause as PauseIcon,
   Check as CompleteIcon,
   Verified as VerifyIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  ThumbUp as AcceptIcon,
+  ThumbDown as RejectIcon,
+  HelpOutline as RequestInfoIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -103,6 +106,9 @@ const Tickets = () => {
     pauseWork,
     completeWork,
     verifyCompletion,
+    acceptTicketByVendor,
+    rejectTicketByVendor,
+    requestMoreInfoByVendor,
     hasLocationAccess,
     hasTicketTierAccess,
     systemConfig,
@@ -583,6 +589,15 @@ const Tickets = () => {
         case 'complete':
           completeWork(selectedTicket.id, actionNote);
           break;
+        case 'accept':
+          acceptTicketByVendor(selectedTicket.id, actionNote);
+          break;
+        case 'reject':
+          rejectTicketByVendor(selectedTicket.id, actionNote);
+          break;
+        case 'requestInfo':
+          requestMoreInfoByVendor(selectedTicket.id, actionNote);
+          break;
         case 'verify':
           verifyCompletion(selectedTicket.id);
           break;
@@ -718,6 +733,38 @@ const Tickets = () => {
         return null;
         
       case 'waiting_vendor_response':
+        if (user.role === 'vendor' && ticket.vendorId === user.vendorId) {
+          return (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<AcceptIcon />}
+                onClick={() => handleActionClick('accept')}
+              >
+                Accept
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<RejectIcon />}
+                onClick={() => handleActionClick('reject')}
+              >
+                Reject
+              </Button>
+              <Button
+                variant="contained"
+                color="info"
+                startIcon={<RequestInfoIcon />}
+                onClick={() => handleActionClick('requestInfo')}
+              >
+                Request Info
+              </Button>
+            </Box>
+          );
+        }
+        return null;
+
       case 'vendor_accepted':
       case 'assigned':
         if (user.role === 'vendor' && ticket.vendorId === user.vendorId) {
@@ -1389,6 +1436,9 @@ const Tickets = () => {
       <Dialog open={actionDialogOpen} onClose={handleCloseActionDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           {actionType === 'assign' && 'Assign Ticket'}
+          {actionType === 'accept' && 'Accept Ticket'}
+          {actionType === 'reject' && 'Reject Ticket'}
+          {actionType === 'requestInfo' && 'Request More Information'}
           {actionType === 'start' && 'Start Work'}
           {actionType === 'pause' && 'Pause Work'}
           {actionType === 'complete' && 'Complete Work'}
@@ -1419,7 +1469,7 @@ const Tickets = () => {
               </Select>
             </FormControl>
           )}
-          
+
           {(actionType === 'pause' || actionType === 'complete') && (
             <TextField
               margin="normal"
@@ -1427,6 +1477,33 @@ const Tickets = () => {
               fullWidth
               id="note"
               label="Note"
+              multiline
+            rows={4}
+            value={actionNote}
+            onChange={(e) => setActionNote(e.target.value)}
+          />
+          )}
+
+          {actionType === 'accept' && (
+            <TextField
+              margin="normal"
+              fullWidth
+              id="note"
+              label="Notes (optional)"
+              multiline
+              rows={4}
+              value={actionNote}
+              onChange={(e) => setActionNote(e.target.value)}
+            />
+          )}
+
+          {(actionType === 'reject' || actionType === 'requestInfo') && (
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="note"
+              label="Reason"
               multiline
               rows={4}
               value={actionNote}
@@ -1447,7 +1524,7 @@ const Tickets = () => {
             variant="contained"
             disabled={
               (actionType === 'assign' && !selectedVendor) ||
-              ((actionType === 'pause' || actionType === 'complete') && !actionNote)
+              ((actionType === 'pause' || actionType === 'complete' || actionType === 'reject' || actionType === 'requestInfo') && !actionNote)
             }
           >
             Confirm
