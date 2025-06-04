@@ -25,6 +25,7 @@ import Vendors from './pages/Vendors';
 import VendorDetail from './pages/VendorDetail';
 import VendorOrganizationSelect from './pages/VendorOrganizationSelect';
 import VendorOrganizationDetail from './pages/VendorOrganizationDetail';
+import TicketDetail from './pages/TicketDetail';
 // Keeping these for backwards compatibility
 import SubAdmins from './pages/SubAdmins';
 import SecurityGroups from './pages/SecurityGroups';
@@ -190,15 +191,25 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/tickets" 
+              <Route
+                path="/tickets"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <Tickets />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
+              />
+              <Route
+                path="/tickets/:id"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <TicketDetail />
+                    </Layout>
+                  </ProtectedRoute>
+                }
               />
               
               {/* Redirect root to dashboard */}
