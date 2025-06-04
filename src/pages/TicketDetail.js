@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -8,9 +8,19 @@ import {
   Grid,
   Stepper,
   Step,
-  StepLabel
+  StepLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
 const ISSUE_TYPES = [
@@ -51,9 +61,19 @@ const TICKET_WORKFLOW = [
 const TicketDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getTicket, getLocation, getVendor } = useData();
+  const {
+    getTicket,
+    getLocation,
+    getVendor,
+    acceptTicketByVendor,
+    rejectTicketByVendor
+  } = useData();
+  const { user } = useAuth();
 
   const ticket = getTicket(id);
+
+  const [rejectDialog, setRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   if (!ticket) {
     return (
@@ -88,7 +108,29 @@ const TicketDetail = () => {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6}>
           <Typography variant="subtitle2">Status</Typography>
-          <Chip label={ticket.status} color={STATUS_COLORS[ticket.status]} size="small" />
+          {user?.role === 'vendor' && (ticket.status === 'New' || ticket.status === 'Assigned') ? (
+            <FormControl fullWidth size="small">
+              <InputLabel id="status-select-label">Select Action</InputLabel>
+              <Select
+                labelId="status-select-label"
+                label="Select Action"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'accept') {
+                    acceptTicketByVendor(ticket.id);
+                  } else if (value === 'reject') {
+                    setRejectDialog(true);
+                  }
+                }}
+                value=""
+              >
+                <MenuItem value="accept">Accept</MenuItem>
+                <MenuItem value="reject">Reject</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <Chip label={ticket.status} color={STATUS_COLORS[ticket.status]} size="small" />
+          )}
         </Grid>
         <Grid item xs={12} sm={6}>
           <Typography variant="subtitle2">Date/Time</Typography>
@@ -126,6 +168,36 @@ const TicketDetail = () => {
           </Step>
         ))}
       </Stepper>
+
+      <Dialog open={rejectDialog} onClose={() => setRejectDialog(false)}>
+        <DialogTitle>Reject Ticket</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Reason"
+            fullWidth
+            multiline
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectDialog(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              rejectTicketByVendor(ticket.id, rejectReason);
+              setRejectDialog(false);
+              setRejectReason('');
+            }}
+            variant="contained"
+            disabled={!rejectReason.trim()}
+            color="error"
+          >
+            Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

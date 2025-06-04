@@ -438,7 +438,7 @@ const VendorOrganizationDetail = () => {
                             ? 'rgba(255, 152, 0, 0.05)'
                             : 'inherit'
                       }}
-                      onClick={() => navigate(`/ticket/${ticket.id}`)}
+                      onClick={() => navigate(`/tickets/${ticket.id}`)}
                     >
                       <TableCell>{ticket.ticketNo}</TableCell>
                       <TableCell>{formatDate(ticket.dateTime)}</TableCell>
@@ -511,7 +511,7 @@ const VendorOrganizationDetail = () => {
                             size="small"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/ticket/${ticket.id}`);
+                              navigate(`/tickets/${ticket.id}`);
                             }}
                           >
                             View
