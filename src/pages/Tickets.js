@@ -45,7 +45,9 @@ import {
   Pause as PauseIcon,
   Check as CompleteIcon,
   Verified as VerifyIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  ThumbUp as AcceptIcon,
+  ThumbDown as RejectIcon
 } from '@mui/icons-material';
 import { useData } from '../context/DataContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -103,6 +105,8 @@ const Tickets = () => {
     pauseWork,
     completeWork,
     verifyCompletion,
+    acceptTicketByVendor,
+    rejectTicketByVendor,
     hasLocationAccess,
     hasTicketTierAccess,
     systemConfig,
@@ -121,6 +125,9 @@ const Tickets = () => {
   const [filteredVendors, setFilteredVendors] = useState([]);
   const [moreInfoDialogOpen, setMoreInfoDialogOpen] = useState(false);
   const [additionalInfo, setAdditionalInfo] = useState('');
+  const [responseDialogOpen, setResponseDialogOpen] = useState(false);
+  const [responseType, setResponseType] = useState('');
+  const [responseNote, setResponseNote] = useState('');
   
   // Generate a temporary ticket number for preview
   const generateTempTicketNo = () => {
@@ -639,6 +646,38 @@ const Tickets = () => {
     }
   };
 
+  // Vendor response dialog handlers
+  const handleOpenResponseDialog = (type) => {
+    setResponseType(type);
+    setResponseNote('');
+    setResponseDialogOpen(true);
+  };
+
+  const handleCloseResponseDialog = () => {
+    setResponseDialogOpen(false);
+    setResponseType('');
+    setResponseNote('');
+  };
+
+  const handleResponseSubmit = () => {
+    if (!selectedTicket) return;
+
+    let success = false;
+    if (responseType === 'accept') {
+      success = acceptTicketByVendor(selectedTicket.id, responseNote);
+    } else if (responseType === 'reject') {
+      success = rejectTicketByVendor(selectedTicket.id, responseNote);
+    }
+
+    if (success) {
+      const updatedTickets = getTickets();
+      setFilteredTickets(applyFilters(updatedTickets));
+      const updatedTicket = getTicket(selectedTicket.id);
+      setSelectedTicket(updatedTicket);
+      handleCloseResponseDialog();
+    }
+  };
+
   // Render action buttons based on ticket status and tier access
   const renderActionButtons = (ticket) => {
     if (!ticket) return null;
@@ -718,6 +757,30 @@ const Tickets = () => {
         return null;
         
       case 'waiting_vendor_response':
+        if (user.role === 'vendor' && ticket.vendorId === user.vendorId) {
+          return (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<AcceptIcon />}
+                onClick={() => handleOpenResponseDialog('accept')}
+              >
+                Accept
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<RejectIcon />}
+                onClick={() => handleOpenResponseDialog('reject')}
+              >
+                Reject
+              </Button>
+            </Box>
+          );
+        }
+        return null;
+
       case 'vendor_accepted':
       case 'assigned':
         if (user.role === 'vendor' && ticket.vendorId === user.vendorId) {
@@ -1454,7 +1517,45 @@ const Tickets = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
+      {/* Vendor Response Dialog */}
+      <Dialog
+        open={responseDialogOpen}
+        onClose={handleCloseResponseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {responseType === 'accept' && 'Accept Ticket'}
+          {responseType === 'reject' && 'Reject Ticket'}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="normal"
+            fullWidth
+            multiline
+            rows={4}
+            id="responseNote"
+            label={responseType === 'accept' ? 'Notes (Optional)' : 'Reason (Required)'}
+            value={responseNote}
+            onChange={(e) => setResponseNote(e.target.value)}
+            required={responseType !== 'accept'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseResponseDialog}>Cancel</Button>
+          <Button
+            onClick={handleResponseSubmit}
+            variant="contained"
+            color={responseType === 'accept' ? 'success' : 'error'}
+            disabled={responseType !== 'accept' && !responseNote}
+          >
+            {responseType === 'accept' ? 'Accept Ticket' : 'Reject Ticket'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* More Info Dialog */}
       <Dialog 
         open={moreInfoDialogOpen} 

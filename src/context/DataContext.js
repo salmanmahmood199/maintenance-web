@@ -773,6 +773,7 @@ export const DataProvider = ({ children }) => {
       dateTime: new Date().toISOString(),
       status: 'New',
       vendorId: null, // will be set when assigned
+      vendorResponseStatus: null,
       notes: notes ? [{text: notes, date: new Date().toISOString(), by: placedBy}] : [],
       mediaUrls,
       priority,
@@ -866,6 +867,7 @@ const assignTicket = (id, vendorId) => {
     vendorId,
     status: 'Assigned',
     currentStep: 'waiting_vendor_response',
+    vendorResponseStatus: null,
     workOrders: [
       ...(ticket.workOrders || []),
       {
@@ -888,11 +890,12 @@ const assignTicket = (id, vendorId) => {
     if (!ticket) return false;
     
     // Update ticket with vendor acceptance
-    updateTicket(id, {
-      ...ticket,
-      status: 'In Progress',
-      currentStep: 'vendor_accepted',
-      workOrders: [
+  updateTicket(id, {
+    ...ticket,
+    status: 'In Progress',
+    currentStep: 'vendor_accepted',
+    vendorResponseStatus: 'accepted',
+    workOrders: [
         ...(ticket.workOrders || []),
         {
           type: 'vendor_accepted',
@@ -913,11 +916,12 @@ const assignTicket = (id, vendorId) => {
     if (!ticket) return false;
     
     // Update ticket with vendor rejection
-    updateTicket(id, {
-      ...ticket,
-      status: 'Rejected',
-      currentStep: 'vendor_rejected',
-      workOrders: [
+  updateTicket(id, {
+    ...ticket,
+    status: 'Rejected',
+    currentStep: 'vendor_rejected',
+    vendorResponseStatus: 'rejected',
+    workOrders: [
         ...(ticket.workOrders || []),
         {
           type: 'vendor_rejected',
@@ -938,11 +942,12 @@ const assignTicket = (id, vendorId) => {
     if (!ticket) return false;
     
     // Update ticket with info request
-    updateTicket(id, {
-      ...ticket,
-      status: 'More Info Needed',
-      currentStep: 'more_info_requested',
-      workOrders: [
+  updateTicket(id, {
+    ...ticket,
+    status: 'More Info Needed',
+    currentStep: 'more_info_requested',
+    vendorResponseStatus: 'more_info_requested',
+    workOrders: [
         ...(ticket.workOrders || []),
         {
           type: 'more_info_requested',
@@ -963,11 +968,12 @@ const assignTicket = (id, vendorId) => {
     if (!ticket) return false;
     
     // Update ticket with additional info
-    updateTicket(id, {
-      ...ticket,
-      status: 'Assigned',
-      currentStep: 'waiting_vendor_response',
-      workOrders: [
+  updateTicket(id, {
+    ...ticket,
+    status: 'Assigned',
+    currentStep: 'waiting_vendor_response',
+    vendorResponseStatus: null,
+    workOrders: [
         ...(ticket.workOrders || []),
         {
           type: 'more_info_provided',

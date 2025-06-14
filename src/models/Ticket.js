@@ -37,6 +37,11 @@ const TicketSchema = new mongoose.Schema({
     default: 'New'
   },
   vendorId: String,
+  vendorResponseStatus: {
+    type: String,
+    enum: ['accepted', 'rejected', 'more_info_requested', null],
+    default: null
+  },
   notes: [NoteSchema],
   mediaUrls: [String],
   adminApproved: {
