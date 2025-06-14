@@ -329,6 +329,12 @@ const VendorOrganizationDetail = () => {
     return date.toLocaleString();
   };
 
+  const responseButtonLabel =
+    responseType === 'accept' ? 'Accept Ticket' :
+    responseType === 'reject' ? 'Reject Ticket' :
+    responseType === 'moreInfo' ? 'Request Info' :
+    'Submit';
+
   return (
     <Box>
       {/* Header */}
@@ -444,42 +450,42 @@ const VendorOrganizationDetail = () => {
                         {/* Only show action buttons for tickets that need vendor response */}
                         {(ticket.status === 'New' || ticket.status === 'Assigned') && !ticket.vendorResponseStatus ? (
                           <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Tooltip title="Accept ticket">
-                              <IconButton 
-                                color="success" 
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenResponseDialog(ticket.id, 'accept');
-                                }}
-                              >
-                                <AcceptIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Reject ticket">
-                              <IconButton 
-                                color="error" 
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenResponseDialog(ticket.id, 'reject');
-                                }}
-                              >
-                                <RejectIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Request more information">
-                              <IconButton 
-                                color="info" 
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenResponseDialog(ticket.id, 'moreInfo');
-                                }}
-                              >
-                                <RequestInfoIcon />
-                              </IconButton>
-                            </Tooltip>
+                            <Button
+                              variant="outlined"
+                              color="success"
+                              size="small"
+                              startIcon={<AcceptIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenResponseDialog(ticket.id, 'accept');
+                              }}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              size="small"
+                              startIcon={<RejectIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenResponseDialog(ticket.id, 'reject');
+                              }}
+                            >
+                              Reject
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="info"
+                              size="small"
+                              startIcon={<RequestInfoIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenResponseDialog(ticket.id, 'moreInfo');
+                              }}
+                            >
+                              More Info
+                            </Button>
                           </Box>
                         ) : (
                           <Button 
@@ -713,13 +719,13 @@ const VendorOrganizationDetail = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseResponseDialog}>Cancel</Button>
-          <Button 
-            onClick={handleResponseSubmit} 
+          <Button
+            onClick={handleResponseSubmit}
             variant="contained"
             color={responseType === 'accept' ? 'success' : responseType === 'reject' ? 'error' : 'primary'}
-            disabled={(responseType !== 'accept' && !responseNote)}
+            disabled={responseType !== 'accept' && !responseNote}
           >
-            Submit
+            {responseButtonLabel}
           </Button>
         </DialogActions>
       </Dialog>
